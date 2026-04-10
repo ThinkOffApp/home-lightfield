@@ -17,7 +17,7 @@ First setup is located in central Helsinki overlooking a park.
 - **SilentGliss SG5100** — motorized curtain track, 433.92MHz RF. Requires raw RF code capture (non-standard encoding, standard RF learning often fails)
 - **Temperature sensor(s)** — for sun/heat-based curtain automation
 - **AC unit** — seasonal, manual on/off (dashboard status indicator only, no automation needed)
-- **Indoor cameras + doorbell camera** — interior person tracking and entrance monitoring
+- **Indoor cameras + doorbell camera** — person tracking and entrance monitoring
 
 ### Infrastructure
 - **Mac mini** — runs Home Assistant, OLA (Art-Net output), animation engine. Ethernet port on Art-Net network, wifi for internet
