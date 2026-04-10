@@ -2,6 +2,8 @@
 
 Full-apartment programmable lighting system with reactive art installations. Replaces Resolume with a custom control stack: Art-Net/DMX over ethernet, camera-driven animations, and Home Assistant integration.
 
+First setup is located in central Helsinki overlooking a park.
+
 ## Hardware
 
 ### DMX Fixtures (Art-Net over ethernet)
@@ -13,7 +15,7 @@ Full-apartment programmable lighting system with reactive art installations. Rep
 - **Philips Hue** — general room lighting (native HA integration)
 - **Sonoff RF Bridge R2** — 433MHz gateway (flash with Tasmota/Portisch for raw RF capture)
 - **SilentGliss SG5100** — motorized curtain track, 433.92MHz RF. Requires raw RF code capture (non-standard encoding, standard RF learning often fails)
-- **2x cameras + 1 doorbell camera** — interior person tracking and entrance monitoring
+- ** indoor cameras + doorbell camera** — interior person tracking and entrance monitoring
 
 ### Infrastructure
 - **Mac mini** — runs Home Assistant, OLA (Art-Net output), animation engine. Ethernet port on Art-Net network, wifi for internet
