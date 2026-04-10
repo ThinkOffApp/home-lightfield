@@ -11,7 +11,8 @@ Full-apartment programmable lighting system with reactive art installations. Rep
 
 ### Smart Home
 - **Philips Hue** — general room lighting (native HA integration)
-- **Sonoff RF Bridge R2** — 433MHz curtain motor control
+- **Sonoff RF Bridge R2** — 433MHz gateway (flash with Tasmota/Portisch for raw RF capture)
+- **SilentGliss SG5100** — motorized curtain track, 433.92MHz RF. Requires raw RF code capture (non-standard encoding, standard RF learning often fails)
 - **2x cameras + 1 doorbell camera** — interior person tracking and entrance monitoring
 
 ### Infrastructure
