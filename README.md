@@ -2,8 +2,6 @@
 
 Full-apartment programmable lighting system with reactive art installations. Replaces Resolume with a custom control stack: Art-Net/DMX over ethernet, camera-driven animations, and Home Assistant integration.
 
-Located in a jugend-era building next to Helsinki Cathedral, overlooking a public park.
-
 ## Hardware
 
 ### DMX Fixtures (Art-Net over ethernet)
