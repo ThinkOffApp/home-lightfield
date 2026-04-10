@@ -15,7 +15,9 @@ First setup is located in central Helsinki overlooking a park.
 - **Philips Hue** — general room lighting (native HA integration)
 - **Sonoff RF Bridge R2** — 433MHz gateway (flash with Tasmota/Portisch for raw RF capture)
 - **SilentGliss SG5100** — motorized curtain track, 433.92MHz RF. Requires raw RF code capture (non-standard encoding, standard RF learning often fails)
-- ** indoor cameras + doorbell camera** — interior person tracking and entrance monitoring
+- **Temperature sensor(s)** — for sun/heat-based curtain automation
+- **AC unit** — seasonal, manual on/off (dashboard status indicator only, no automation needed)
+- **Indoor cameras + doorbell camera** — interior person tracking and entrance monitoring
 
 ### Infrastructure
 - **Mac mini** — runs Home Assistant, OLA (Art-Net output), animation engine. Ethernet port on Art-Net network, wifi for internet
@@ -54,7 +56,8 @@ Cameras ──► Frigate (CV/AI) ──► Home Assistant ──► Automation 
 
 ### 3. Home Assistant Integration
 - **Doorbell:** color indicator on LED strip when person approaches. Persistent segment color when package is left
-- **Curtains:** Sonoff RF Bridge R2 control via HA
+- **Curtains:** Sonoff RF Bridge R2 control via HA. South-facing curtains auto-close based on temperature + sun position (HA sun integration provides azimuth/elevation)
+- **Temperature:** monitor indoor temp, trigger curtain/scene automations on heat thresholds
 - **Hue:** coordinated with DMX for full-room scenes
 - **Presence:** Frigate zones trigger lighting automations
 
