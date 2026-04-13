@@ -59,19 +59,30 @@ def build_dmx_frame(left_grid, right_grid, brightness=BRIGHTNESS):
 
 
 def send_frame(sock, dmx):
-    """Send a DMX frame via Art-Net."""
-    packet = bytearray()
-    packet += ARTNET_HEADER
-    packet += struct.pack('<H', OPCODE_OUTPUT)
-    packet += struct.pack('>H', 14)   # protocol version
-    packet += struct.pack('B', 0)     # sequence
-    packet += struct.pack('B', 0)     # physical
-    packet += struct.pack('<H', BLINDER_UNIVERSE)
-    packet += struct.pack('>H', 512)
-    packet += dmx
+    """Send a DMX frame via Art-Net.
+    Sends on the blinder universe plus extra universes to ensure
+    the left blinder's node (which needs broadcast-style flooding) receives data."""
+    # Send on the primary blinder universe and a few extras
+    # The left blinder only responds when all nodes get data on multiple universes
+    universes_to_send = [
+        BLINDER_UNIVERSE,           # subnet 1, uni 14 (primary)
+        (0 << 4) | 14,             # subnet 0, uni 14
+        (1 << 4) | 15,             # subnet 1, uni 15
+    ]
 
-    for target in TARGETS:
-        sock.sendto(packet, (target, 6454))
+    for uni in universes_to_send:
+        packet = bytearray()
+        packet += ARTNET_HEADER
+        packet += struct.pack('<H', OPCODE_OUTPUT)
+        packet += struct.pack('>H', 14)   # protocol version
+        packet += struct.pack('B', 0)     # sequence
+        packet += struct.pack('B', 0)     # physical
+        packet += struct.pack('<H', uni)
+        packet += struct.pack('>H', 512)
+        packet += dmx
+
+        for target in TARGETS:
+            sock.sendto(packet, (target, 6454))
 
 
 def play_sequence(sock, sequence, brightness=BRIGHTNESS):
