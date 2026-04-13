@@ -1,0 +1,214 @@
+title: Lightfield
+views:
+  - title: Main
+    path: main
+    type: panel
+    cards:
+      - type: custom:layout-card
+        layout_type: grid
+        layout:
+          grid-template-columns: 1fr 1fr 1fr
+          grid-template-rows: 1fr 1fr
+          height: 100vh
+          margin: 0
+          padding: 8px
+          gap: 8px
+        cards:
+          # ── Row 1: Camera feeds ──────────────────────────
+          - type: picture-entity
+            entity: camera.tyohuone_camera
+            name: Office
+            camera_view: live
+            show_state: false
+            show_name: true
+            style: |
+              ha-card {
+                height: 100%;
+                overflow: hidden;
+                border-radius: 12px;
+              }
+
+          - type: picture-entity
+            entity: camera.alakerta_kamera
+            name: Downstairs
+            camera_view: live
+            show_state: false
+            show_name: true
+            style: |
+              ha-card {
+                height: 100%;
+                overflow: hidden;
+                border-radius: 12px;
+              }
+
+          - type: picture-entity
+            entity: camera.entryway_doorbell
+            name: Doorbell
+            camera_view: live
+            show_state: false
+            show_name: true
+            style: |
+              ha-card {
+                height: 100%;
+                overflow: hidden;
+                border-radius: 12px;
+              }
+
+          # ── Row 2, Col 1-2: Light controls ───────────────
+          - type: vertical-stack
+            view_layout:
+              grid-column: span 2
+            cards:
+              - type: custom:mushroom-title-card
+                title: Lights
+
+              - type: grid
+                columns: 2
+                square: false
+                cards:
+                  # Kitchen
+                  - type: custom:mushroom-light-card
+                    entity: light.keittio_saarekevalo
+                    name: "Kitchen Island"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.keittio_tyovalo
+                    name: "Kitchen Counter"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.keittio_saareke_tyovalo
+                    name: "Kitchen Island Work"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.keittio_ylalednauha
+                    name: "Kitchen LED Strip"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.keittio_seinavalo
+                    name: "Kitchen Wall"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.keittiosaaareke
+                    name: "Kitchen Island Group"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  # Living Room
+                  - type: custom:mushroom-light-card
+                    entity: light.olohuone_ylalednauha
+                    name: "Living Room LED"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  # Bedroom
+                  - type: custom:mushroom-light-card
+                    entity: light.makuuhuone_led_nauha
+                    name: "Bedroom LED"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  # Bathroom
+                  - type: custom:mushroom-light-card
+                    entity: light.kylpyhuone_led_nauha
+                    name: "Bathroom LED"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.kylpyhuone_peililednauha
+                    name: "Bathroom Mirror"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  # Hallway
+                  - type: custom:mushroom-light-card
+                    entity: light.eteinen_spotit
+                    name: "Hallway Spots"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.eteinen_lednauha
+                    name: "Hallway LED"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  # Library
+                  - type: custom:mushroom-light-card
+                    entity: light.kirjasto_lednauha
+                    name: "Library LED"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+                  - type: custom:mushroom-light-card
+                    entity: light.kirjasto_kattoikkuna
+                    name: "Library Skylight"
+                    use_light_color: true
+                    show_brightness_control: true
+                    collapsible_controls: false
+                    layout: horizontal
+
+          # ── Row 2, Col 3: DMX + Weather ──────────────────
+          - type: vertical-stack
+            cards:
+              # DMX Status placeholder
+              - type: custom:mushroom-title-card
+                title: DMX
+
+              - type: entities
+                entities:
+                  - entity: sensor.dmx_status
+                    name: "Art-Net Status"
+                    icon: mdi:led-strip-variant
+                  - entity: sensor.dmx_universe_1
+                    name: "Universe 1"
+                    icon: mdi:numeric-1-circle
+                  - entity: sensor.dmx_universe_2
+                    name: "Universe 2"
+                    icon: mdi:numeric-2-circle
+                state_color: true
+
+              # Weather
+              - type: custom:mushroom-title-card
+                title: Weather
+
+              - type: weather-forecast
+                entity: weather.forecast_home
+                show_forecast: true
+                forecast_type: daily

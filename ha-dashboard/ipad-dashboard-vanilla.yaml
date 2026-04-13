@@ -1,0 +1,128 @@
+title: Lightfield
+views:
+  - title: Main
+    path: main
+    type: sections
+    max_columns: 3
+    sections:
+      # ── Column 1: Office camera + Kitchen/Living lights ──
+      - type: grid
+        cards:
+          - type: picture-entity
+            entity: camera.tyohuone_camera
+            name: Office
+            camera_view: live
+            show_state: false
+            show_name: true
+
+          - type: heading
+            heading: Kitchen
+            heading_style: subtitle
+
+          - type: light
+            entity: light.keittio_saarekevalo
+            name: Island
+
+          - type: light
+            entity: light.keittio_tyovalo
+            name: Counter
+
+          - type: light
+            entity: light.keittio_ylalednauha
+            name: LED Strip
+
+          - type: light
+            entity: light.keittio_seinavalo
+            name: Wall
+
+          - type: heading
+            heading: Living Room
+            heading_style: subtitle
+
+          - type: light
+            entity: light.olohuone_ylalednauha
+            name: LED Strip
+
+      # ── Column 2: Downstairs camera + Bedroom/Bathroom lights ──
+      - type: grid
+        cards:
+          - type: picture-entity
+            entity: camera.alakerta_kamera
+            name: Downstairs
+            camera_view: live
+            show_state: false
+            show_name: true
+
+          - type: heading
+            heading: Bedroom
+            heading_style: subtitle
+
+          - type: light
+            entity: light.makuuhuone_led_nauha
+            name: LED Strip
+
+          - type: heading
+            heading: Bathroom
+            heading_style: subtitle
+
+          - type: light
+            entity: light.kylpyhuone_led_nauha
+            name: LED Strip
+
+          - type: light
+            entity: light.kylpyhuone_peililednauha
+            name: Mirror
+
+          - type: heading
+            heading: Hallway
+            heading_style: subtitle
+
+          - type: light
+            entity: light.eteinen_spotit
+            name: Spots
+
+          - type: light
+            entity: light.eteinen_lednauha
+            name: LED Strip
+
+      # ── Column 3: Doorbell camera + Library lights + DMX + Weather ──
+      - type: grid
+        cards:
+          - type: picture-entity
+            entity: camera.entryway_doorbell
+            name: Doorbell
+            camera_view: live
+            show_state: false
+            show_name: true
+
+          - type: heading
+            heading: Library
+            heading_style: subtitle
+
+          - type: light
+            entity: light.kirjasto_lednauha
+            name: LED Strip
+
+          - type: light
+            entity: light.kirjasto_kattoikkuna
+            name: Skylight
+
+          - type: heading
+            heading: DMX / Art-Net
+            heading_style: subtitle
+
+          - type: markdown
+            content: |
+              **Status:** Offline (Dell not connected)
+              **Strips:** 110m RGBW
+              **Blinders:** 2x 5x5 RGB
+              **Spots:** 6x RGBW
+
+          - type: heading
+            heading: Weather
+            heading_style: subtitle
+
+          - type: weather-forecast
+            entity: weather.forecast_home
+            show_forecast: true
+            forecast_type: daily
