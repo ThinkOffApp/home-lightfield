@@ -18,7 +18,12 @@ from expressions import (
     eye_open, eye_closed, eye_blink_top, eye_half_closed,
     eye_wide, eye_squint, eye_supernova, eye_spiral,
     eye_heart, eye_x, eye_arrow, look_at_xy,
-    IRIS_COLOR, LOOK_POSITIONS
+    eye_ripple, eye_plasma, eye_pinwheel, eye_rain,
+    eye_kaleidoscope, eye_breathe, eye_scroll_text, eye_scroll_text_wide,
+    _text_to_columns,
+    IRIS_COLOR, LOOK_POSITIONS,
+    THINKOFF_PALETTE, PINK_FUCHSIA,
+    TK_CORE, TK_MID, TK_EDGE, TK_MAGENTA, TK_BLUE, TK_INDIGO,
 )
 
 
@@ -233,6 +238,112 @@ def independent_look(left_target, right_target, iris_color=IRIS_COLOR):
     left = eye_open(lx, ly, iris_color)
     right = eye_open(rx, ry, iris_color)
     yield (left, right, 1000)
+
+
+def ripple(duration_sec=5.0, colors=THINKOFF_PALETTE):
+    """Concentric color ripples radiating from center."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_ripple(phase, colors)
+        yield (frame, frame, 50)
+
+
+def plasma(duration_sec=5.0, colors=THINKOFF_PALETTE):
+    """Plasma interference pattern."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_plasma(phase, colors)
+        yield (frame, frame, 50)
+
+
+def pinwheel(duration_sec=5.0, colors=THINKOFF_PALETTE, arms=3):
+    """Spinning pinwheel/starburst."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_pinwheel(phase, colors, arms)
+        yield (frame, frame, 50)
+
+
+def color_rain(duration_sec=5.0, colors=THINKOFF_PALETTE):
+    """Color rain cascading down."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_rain(phase, colors)
+        yield (frame, frame, 50)
+
+
+def kaleidoscope(duration_sec=5.0, colors=THINKOFF_PALETTE):
+    """Kaleidoscope mirror pattern."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_kaleidoscope(phase, colors)
+        yield (frame, frame, 50)
+
+
+def breathe(duration_sec=5.0, color_a=TK_CORE, color_b=TK_MAGENTA):
+    """Slow breathe between two colors."""
+    steps = int(duration_sec * 20)
+    for i in range(steps):
+        phase = (i / steps) % 1.0
+        frame = eye_breathe(phase, color_a, color_b)
+        yield (frame, frame, 50)
+
+
+def pink_fuchsia_spiral(duration_sec=5.0):
+    """Hypnotic spiral in pink-fuchsia-purple shades."""
+    yield from hypnotize(duration_sec, PINK_FUCHSIA[0])
+
+
+def pink_fuchsia_ripple(duration_sec=5.0):
+    """Concentric ripples in pink-fuchsia-purple."""
+    yield from ripple(duration_sec, PINK_FUCHSIA)
+
+
+def pink_fuchsia_plasma(duration_sec=5.0):
+    """Plasma in pink-fuchsia-purple."""
+    yield from plasma(duration_sec, PINK_FUCHSIA)
+
+
+def thinkoff_spiral(duration_sec=5.0):
+    """Hypnotic spiral using TK_CORE brand pink."""
+    yield from hypnotize(duration_sec, TK_CORE)
+
+
+def thinkoff_ripple(duration_sec=5.0):
+    """Ripples in full ThinkOff 7-color palette."""
+    yield from ripple(duration_sec, THINKOFF_PALETTE)
+
+
+def thinkoff_plasma(duration_sec=5.0):
+    """Plasma in full ThinkOff 7-color palette."""
+    yield from plasma(duration_sec, THINKOFF_PALETTE)
+
+
+def thinkoff_pinwheel(duration_sec=5.0):
+    """Pinwheel in full ThinkOff 7-color palette."""
+    yield from pinwheel(duration_sec, THINKOFF_PALETTE)
+
+
+def thinkoff_kaleidoscope(duration_sec=5.0):
+    """Kaleidoscope in full ThinkOff 7-color palette."""
+    yield from kaleidoscope(duration_sec, THINKOFF_PALETTE)
+
+
+def scroll_text(text, color=TK_CORE, speed_ms=150, loops=2):
+    """Scroll text across both blinders (10 columns wide). Each frame shifts one column left."""
+    columns = _text_to_columns(text)
+    total = len(columns)
+    if total == 0:
+        return
+    for loop in range(loops):
+        for offset in range(total):
+            left, right = eye_scroll_text_wide(text, offset, color)
+            yield (left, right, speed_ms)
 
 
 # Camera event triggers - map detected events to expressions

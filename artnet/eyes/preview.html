@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eye Blinder Animations</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; color: #eee; font-family: -apple-system, sans-serif; padding: 20px; }
+h1 { text-align: center; margin-bottom: 8px; font-size: 24px; color: #8cf; }
+.subtitle { text-align: center; color: #666; margin-bottom: 16px; font-size: 14px; }
+h2 { color: #8cf; margin: 30px 0 15px; font-size: 18px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+.grid-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+.card { background: #1a1a1a; border-radius: 10px; padding: 12px; text-align: center; border: 1px solid #333; }
+.card:hover { border-color: #8cf; }
+.card-label { font-size: 13px; color: #aaa; margin-bottom: 8px; font-weight: 500; }
+.card-sublabel { font-size: 11px; color: #666; margin-top: 4px; }
+.eyes { display: flex; gap: 8px; justify-content: center; }
+canvas { border-radius: 4px; }
+#tracker-section { background: #1a1a1a; border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid #333; text-align: center; }
+#tracker-section h2 { margin-top: 0; border: none; }
+#tracker-area { width: 100%; max-width: 600px; height: 200px; background: #222; border-radius: 8px; margin: 15px auto; cursor: crosshair; position: relative; display: flex; align-items: center; justify-content: center; gap: 40px; }
+#tracker-hint { color: #555; font-size: 12px; }
+
+/* Tab navigation */
+.tab-bar { display: flex; justify-content: center; gap: 4px; margin-bottom: 24px; }
+.tab-btn { background: #222; color: #888; border: 1px solid #333; padding: 10px 24px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+.tab-btn:hover { color: #aaa; border-color: #555; }
+.tab-btn.active { background: #1a1a1a; color: #8cf; border-color: #8cf; border-bottom-color: #1a1a1a; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Camera control tab */
+.camera-layout { display: flex; gap: 20px; flex-wrap: wrap; }
+.camera-panel { flex: 1; min-width: 300px; background: #1a1a1a; border-radius: 12px; padding: 16px; border: 1px solid #333; }
+.camera-panel h3 { color: #8cf; margin-bottom: 12px; font-size: 16px; }
+#camera-canvas { width: 100%; border-radius: 8px; background: #000; }
+.blinder-preview { display: flex; gap: 16px; justify-content: center; margin-top: 12px; }
+.blinder-preview canvas { border-radius: 4px; }
+.status-bar { background: #1a1a1a; border-radius: 8px; padding: 12px 16px; margin-top: 16px; border: 1px solid #333; font-size: 13px; display: flex; gap: 20px; flex-wrap: wrap; }
+.status-item { color: #888; }
+.status-item span { color: #8cf; }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.status-dot.on { background: #4f4; }
+.status-dot.off { background: #f44; }
+.detection-log { background: #0a0a0a; border-radius: 6px; padding: 10px; margin-top: 12px; font-family: monospace; font-size: 12px; color: #6a6; max-height: 120px; overflow-y: auto; }
+
+/* Settings panel */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.setting-group { background: #222; border-radius: 8px; padding: 12px; }
+.setting-group label { display: block; color: #888; font-size: 12px; margin-bottom: 4px; }
+.setting-group input, .setting-group select { width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 6px 8px; border-radius: 4px; font-size: 13px; }
+.setting-group input[type="range"] { padding: 2px; }
+.mapping-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.mapping-table th, .mapping-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #333; font-size: 13px; }
+.mapping-table th { color: #888; font-weight: 500; }
+.mapping-table select { background: #333; color: #eee; border: 1px solid #444; padding: 4px; border-radius: 3px; }
+.btn { background: #333; color: #8cf; border: 1px solid #8cf; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+.btn:hover { background: #8cf; color: #111; }
+.btn-sm { padding: 4px 12px; font-size: 12px; }
+.weather-display { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #222; border-radius: 6px; margin-top: 8px; }
+.sun-display { display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: #888; }
+.sun-display span { color: #fa0; }
+
+@media (max-width: 768px) {
+  .settings-grid { grid-template-columns: 1fr; }
+  .camera-layout { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<h1>Eye Blinder Animations</h1>
+<p class="subtitle">Cameo Matrix 300 - 5x5 RGB Grid Preview</p>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('eyes')">Eyes Preview</button>
+  <button class="tab-btn" onclick="switchTab('patterns')">New Patterns</button>
+  <button class="tab-btn" onclick="switchTab('camera')">Camera Control</button>
+</div>
+
+<!-- ==================== TAB 1: EYES PREVIEW ==================== -->
+<div id="tab-eyes" class="tab-content active">
+
+<div id="tracker-section">
+<h2>Mouse Tracking (Camera Simulation)</h2>
+<div id="tracker-area">
+  <canvas id="track-L" width="120" height="120"></canvas>
+  <canvas id="track-R" width="120" height="120"></canvas>
+</div>
+<p id="tracker-hint">Move mouse over the area above</p>
+</div>
+
+<div style="text-align:center;margin-bottom:20px">
+<button id="style-toggle" onclick="toggleStyle()" class="btn">Switch to Small Iris</button>
+</div>
+<h2>Expressions (Static)</h2>
+<div class="grid-container" id="static-expressions"></div>
+
+<h2>Animated Sequences</h2>
+<div class="grid-container" id="animated-sequences"></div>
+</div>
+
+<!-- ==================== TAB 2: NEW PATTERNS ==================== -->
+<div id="tab-patterns" class="tab-content">
+
+<div style="background:#1a1a1a;border-radius:12px;padding:16px;margin-bottom:24px;border:1px solid #333;text-align:center">
+  <h3 style="color:#8cf;margin-bottom:12px">ThinkOff Color Selector</h3>
+  <div id="color-selector" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"></div>
+  <div style="margin-top:12px;color:#888;font-size:12px">Selected: <span id="selected-color-name" style="color:#8cf">Fuchsia</span></div>
+  <div style="margin-top:8px">
+    <canvas id="selected-spiral-L" width="120" height="120" style="border-radius:4px"></canvas>
+    <canvas id="selected-spiral-R" width="120" height="120" style="border-radius:4px;margin-left:8px"></canvas>
+  </div>
+  <div style="color:#666;font-size:11px;margin-top:4px">Live spiral preview in selected color</div>
+</div>
+
+<h2>Hypnotic Patterns - ThinkOff 7-Color</h2>
+<div class="grid-container" id="patterns-tk"></div>
+
+<h2>Hypnotic Patterns - Pink / Fuchsia / Purple</h2>
+<div class="grid-container" id="patterns-pf"></div>
+
+<h2>Hypnotic Patterns - Custom Colors</h2>
+<div class="grid-container" id="patterns-misc"></div>
+</div>
+
+<!-- ==================== TAB 3: CAMERA CONTROL ==================== -->
+<div id="tab-camera" class="tab-content">
+
+<div class="camera-layout">
+  <div class="camera-panel" style="flex:2">
+    <h3>Camera View</h3>
+    <div style="position:relative;display:inline-block;width:100%;">
+      <video id="camera-video" autoplay playsinline muted style="width:100%;border-radius:8px;background:#000;display:block;"></video>
+      <canvas id="detection-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;border-radius:8px;"></canvas>
+    </div>
+    <canvas id="camera-canvas" width="640" height="480" style="display:none;"></canvas>
+    <div class="detection-log" id="detection-log">Waiting for detector connection...</div>
+  </div>
+  <div class="camera-panel" style="flex:1">
+    <h3>Blinder Preview</h3>
+    <div class="blinder-preview">
+      <div style="text-align:center">
+        <div style="color:#666;font-size:11px;margin-bottom:4px">Left</div>
+        <canvas id="blinder-L" width="120" height="120"></canvas>
+      </div>
+      <div style="text-align:center">
+        <div style="color:#666;font-size:11px;margin-bottom:4px">Right</div>
+        <canvas id="blinder-R" width="120" height="120"></canvas>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <h3>Current Animation</h3>
+      <div id="anim-name" style="color:#8cf;font-size:18px;margin-top:8px">--</div>
+    </div>
+    <div style="margin-top:16px">
+      <h3>Weather</h3>
+      <div class="weather-display" id="weather-display">
+        <span style="font-size:24px" id="weather-icon">--</span>
+        <div>
+          <div id="weather-mood" style="color:#8cf">--</div>
+          <div id="weather-temp" style="color:#888;font-size:12px">--</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <h3>Sun Times</h3>
+      <div class="sun-display">
+        <div>Sunrise: <span id="sun-rise">--</span></div>
+        <div>Sunset: <span id="sun-set">--</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-item"><span class="status-dot" id="conn-dot"></span>Detector: <span id="conn-status">disconnected</span></div>
+  <div class="status-item">Active: <span id="sched-active">--</span></div>
+  <div class="status-item">Frames: <span id="frame-count">0</span></div>
+  <div class="status-item">Uptime: <span id="uptime">--</span></div>
+</div>
+
+<h2>Settings</h2>
+<div class="settings-grid">
+  <div class="setting-group">
+    <label>Camera Entity</label>
+    <select id="cfg-camera">
+      <option value="camera.tyohuone_camera">Office (Tyohuone)</option>
+      <option value="camera.alakerta_kamera">Ground Floor (Alakerta)</option>
+      <option value="camera.entryway_doorbell">Doorbell (Entryway)</option>
+    </select>
+  </div>
+  <div class="setting-group">
+    <label>Home Assistant URL</label>
+    <input type="text" id="cfg-ha-url" value="http://localhost:8123" />
+  </div>
+  <div class="setting-group">
+    <label>HA Long-Lived Token</label>
+    <input type="password" id="cfg-ha-token" placeholder="Create in HA: Settings > Security" />
+  </div>
+  <div class="setting-group">
+    <label>Poll Interval: <span id="poll-val">1.5</span>s</label>
+    <input type="range" id="cfg-poll" min="0.5" max="5" step="0.5" value="1.5" oninput="document.getElementById('poll-val').textContent=this.value" />
+  </div>
+  <div class="setting-group">
+    <label>Confidence Threshold: <span id="conf-val">0.5</span></label>
+    <input type="range" id="cfg-confidence" min="0.1" max="0.95" step="0.05" value="0.5" oninput="document.getElementById('conf-val').textContent=this.value" />
+  </div>
+  <div class="setting-group">
+    <label>Brightness: <span id="bright-val">1</span>%</label>
+    <input type="range" id="cfg-brightness" min="0.5" max="100" step="0.5" value="1" oninput="document.getElementById('bright-val').textContent=this.value" />
+  </div>
+  <div class="setting-group">
+    <label>Schedule Window 1</label>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="cfg-sched-start" value="sunset-10m" style="flex:1" />
+      <span style="color:#666;padding-top:6px">to</span>
+      <input type="text" id="cfg-sched-end" value="sunset+60m" style="flex:1" />
+    </div>
+  </div>
+  <div class="setting-group">
+    <label>Options</label>
+    <div style="display:flex;gap:16px;margin-top:4px">
+      <label style="font-size:13px;color:#ccc"><input type="checkbox" id="cfg-always-on" /> Always On</label>
+      <label style="font-size:13px;color:#ccc"><input type="checkbox" id="cfg-weather" checked /> Weather Reactive</label>
+    </div>
+  </div>
+</div>
+
+<h2>Text Message</h2>
+<div style="background:#1a1a1a;border-radius:12px;padding:16px;border:1px solid #333;margin-bottom:24px">
+  <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+    <div style="flex:2;min-width:200px">
+      <label style="color:#888;font-size:12px;display:block;margin-bottom:4px">Message (short text, scrolls across blinders)</label>
+      <input type="text" id="msg-text" placeholder="HI" maxlength="20" style="width:100%;background:#333;color:#eee;border:1px solid #444;padding:8px;border-radius:4px;font-size:16px" />
+    </div>
+    <div>
+      <label style="color:#888;font-size:12px;display:block;margin-bottom:4px">Color</label>
+      <select id="msg-color" style="background:#333;color:#eee;border:1px solid #444;padding:8px;border-radius:4px">
+        <option value="255,119,255">Fuchsia</option>
+        <option value="255,170,221">Light Pink</option>
+        <option value="255,0,255">Hot Pink</option>
+        <option value="204,0,204">Magenta</option>
+        <option value="255,153,0">Orange</option>
+        <option value="255,221,0">Gold</option>
+        <option value="153,221,0">Lime</option>
+        <option value="85,170,0">Green</option>
+        <option value="0,140,255">Blue</option>
+        <option value="255,255,255">White</option>
+      </select>
+    </div>
+    <button class="btn" onclick="sendMessage()">Send to Blinders</button>
+  </div>
+  <div style="margin-top:12px">
+    <canvas id="msg-preview-L" width="120" height="120" style="border-radius:4px"></canvas>
+    <canvas id="msg-preview-R" width="120" height="120" style="border-radius:4px;margin-left:8px"></canvas>
+    <div style="color:#666;font-size:11px;margin-top:4px">Text preview (live scroll)</div>
+  </div>
+</div>
+
+<h2>Safety</h2>
+<div class="settings-grid" style="margin-bottom:24px">
+  <div class="setting-group">
+    <label>Max On Time: <span id="maxon-val">5</span> minutes</label>
+    <input type="range" id="cfg-maxon" min="1" max="30" step="1" value="5" oninput="document.getElementById('maxon-val').textContent=this.value" />
+    <div style="color:#666;font-size:11px;margin-top:4px">Blinders auto-off after this to prevent overheating</div>
+  </div>
+  <div class="setting-group">
+    <label>Cooldown: <span id="cooldown-val">10</span> minutes</label>
+    <input type="range" id="cfg-cooldown" min="5" max="60" step="5" value="10" oninput="document.getElementById('cooldown-val').textContent=this.value" />
+    <div style="color:#666;font-size:11px;margin-top:4px">Stay off this long after max on time reached</div>
+  </div>
+</div>
+
+<h2>Detection Mappings</h2>
+<table class="mapping-table" id="mapping-table">
+  <thead><tr><th>Object</th><th>Animation</th><th>Priority</th></tr></thead>
+  <tbody id="mapping-body"></tbody>
+</table>
+<div style="margin-top:16px;text-align:center">
+  <button class="btn" onclick="saveConfig()">Save Settings to Detector</button>
+</div>
+
+</div>
+
+<script>
+// ==================== CORE RENDERING ====================
+const SZ = 120, COLS = 5, ROWS = 5;
+const PX = SZ / (COLS + 1);
+const RAD = PX * 0.38;
+
+function drawGrid(ctx, pixels) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, SZ, SZ);
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x < 5; x++) {
+      const [r, g, b] = pixels[y][x];
+      const cx = PX + x * PX, cy = PX + y * PX;
+      ctx.beginPath();
+      ctx.arc(cx, cy, RAD, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+}
+
+function emptyGrid() { return Array.from({length:5}, () => Array.from({length:5}, () => [0,0,0])); }
+function copyGrid(g) { return g.map(r => r.map(c => [...c])); }
+function blendGrids(a, b, f) {
+  const g = emptyGrid();
+  for (let y=0;y<5;y++) for (let x=0;x<5;x++)
+    g[y][x] = [
+      Math.round(a[y][x][0]*(1-f)+b[y][x][0]*f),
+      Math.round(a[y][x][1]*(1-f)+b[y][x][1]*f),
+      Math.round(a[y][x][2]*(1-f)+b[y][x][2]*f)
+    ];
+  return g;
+}
+
+// ==================== COLORS ====================
+const IRIS=[0,140,255], PUPIL=[0,0,0], WHITE=[255,255,255], LID=[0,0,0];
+const TK_WHITE=[255,255,255], TK_BLUE=[96,165,250], TK_INDIGO=[165,180,252];
+const TK_MAGENTA=[217,70,239], TK_CORE=[212,165,233], TK_MID=[232,197,245], TK_EDGE=[240,208,248];
+const THINKOFF_PALETTE = [TK_WHITE,TK_BLUE,TK_INDIGO,TK_MAGENTA,TK_CORE,TK_MID,TK_EDGE];
+const PINK_FUCHSIA = [[255,105,180],[255,0,255],[217,70,239],[186,85,211],[148,0,211],[128,0,128]];
+
+// ThinkOff.app brand palette (8 selector colors)
+const TKAPP = {
+  'Light Pink': [255,170,221],
+  'Fuchsia':    [255,119,255],
+  'Hot Pink':   [255,0,255],
+  'Magenta':    [204,0,204],
+  'Orange':     [255,153,0],
+  'Gold':       [255,221,0],
+  'Lime':       [153,221,0],
+  'Green':      [85,170,0],
+};
+const TKAPP_COLORS = Object.values(TKAPP);
+let selectedColor = TKAPP_COLORS[1]; // default: Fuchsia
+
+function dist(x1,y1,x2,y2) { return Math.sqrt((x1-x2)**2+(y1-y2)**2); }
+
+// ==================== EYE EXPRESSIONS ====================
+const SM = {
+  center:[[0,1,1,1,0],[1,1,2,1,1],[1,2,3,2,1],[1,1,2,1,1],[0,1,1,1,0]],
+  left:[[0,1,1,1,0],[1,2,1,1,1],[2,3,2,1,1],[1,2,1,1,1],[0,1,1,1,0]],
+  far_left:[[0,1,1,1,0],[2,1,1,1,1],[3,2,1,1,1],[2,1,1,1,1],[0,1,1,1,0]],
+  right:[[0,1,1,1,0],[1,1,1,2,1],[1,1,2,3,2],[1,1,1,2,1],[0,1,1,1,0]],
+  far_right:[[0,1,1,1,0],[1,1,1,1,2],[1,1,1,2,3],[1,1,1,1,2],[0,1,1,1,0]],
+  up:[[0,1,2,1,0],[1,2,3,2,1],[1,1,2,1,1],[1,1,1,1,1],[0,1,1,1,0]],
+  down:[[0,1,1,1,0],[1,1,1,1,1],[1,1,2,1,1],[1,2,3,2,1],[0,1,2,1,0]],
+  up_left:[[0,2,1,1,0],[2,3,2,1,1],[1,2,1,1,1],[1,1,1,1,1],[0,1,1,1,0]],
+  up_right:[[0,1,1,2,0],[1,1,2,3,2],[1,1,1,2,1],[1,1,1,1,1],[0,1,1,1,0]],
+  down_left:[[0,1,1,1,0],[1,1,1,1,1],[1,2,1,1,1],[2,3,2,1,1],[0,2,1,1,0]],
+  down_right:[[0,1,1,1,0],[1,1,1,1,1],[1,1,1,2,1],[1,1,2,3,2],[0,1,1,2,0]],
+};
+const NM = {
+  center:[[0,1,1,1,0],[1,2,2,2,1],[1,2,3,2,1],[1,2,2,2,1],[0,1,1,1,0]],
+  left:[[0,1,1,1,0],[2,2,1,1,1],[2,3,2,1,1],[2,2,1,1,1],[0,1,1,1,0]],
+  far_left:[[0,1,1,1,0],[2,2,1,1,1],[3,2,1,1,1],[2,2,1,1,1],[0,1,1,1,0]],
+  right:[[0,1,1,1,0],[1,1,1,2,2],[1,1,2,3,2],[1,1,1,2,2],[0,1,1,1,0]],
+  far_right:[[0,1,1,1,0],[1,1,1,2,2],[1,1,1,2,3],[1,1,1,2,2],[0,1,1,1,0]],
+  up:[[0,2,2,2,0],[1,2,3,2,1],[1,2,2,2,1],[1,1,1,1,1],[0,1,1,1,0]],
+  down:[[0,1,1,1,0],[1,1,1,1,1],[1,2,2,2,1],[1,2,3,2,1],[0,2,2,2,0]],
+  up_left:[[0,2,2,1,0],[2,3,2,1,1],[2,2,1,1,1],[1,1,1,1,1],[0,1,1,1,0]],
+  up_right:[[0,1,2,2,0],[1,1,2,3,2],[1,1,1,2,2],[1,1,1,1,1],[0,1,1,1,0]],
+  down_left:[[0,1,1,1,0],[1,1,1,1,1],[2,2,1,1,1],[2,3,2,1,1],[0,2,2,1,0]],
+  down_right:[[0,1,1,1,0],[1,1,1,1,1],[1,1,1,2,2],[1,1,2,3,2],[0,1,2,2,0]],
+};
+const SPECIALS = {
+  closed:[[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0],[0,0,0,0,0]],
+  blink_mid:[[0,0,0,0,0],[0,0,0,0,0],[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0]],
+  squint:[[0,0,0,0,0],[0,0,0,0,0],[1,2,3,2,1],[0,0,0,0,0],[0,0,0,0,0]],
+};
+const SM_WIDE = [[1,1,1,1,1],[1,1,2,1,1],[1,2,3,2,1],[1,1,2,1,1],[1,1,1,1,1]];
+const NM_WIDE = [[1,1,1,1,1],[1,2,2,2,1],[1,2,3,2,1],[1,2,2,2,1],[1,1,1,1,1]];
+
+let eyeStyle = 'nm';
+function getMap(n) { const m = eyeStyle==='nm'?NM:SM; return m[n]||SPECIALS[n]||(n==='wide'?(eyeStyle==='nm'?NM_WIDE:SM_WIDE):m.center); }
+function mapToGrid(n,ic=IRIS) { const g=emptyGrid(),m=getMap(n),c={0:[...LID],1:[...WHITE],2:[...ic],3:[...PUPIL]}; for(let y=0;y<5;y++) for(let x=0;x<5;x++) g[y][x]=[...c[m[y][x]]]; return g; }
+
+function eyeOpen(lx=0,ly=0.5,ic=IRIS) {
+  let n; if(ly<-0.1){n=lx<-0.2?'up_left':lx>0.2?'up_right':'up';}else if(ly>0.7){n=lx<-0.2?'down_left':lx>0.2?'down_right':'down';}else{n=lx<-0.6?'far_left':lx<-0.2?'left':lx>0.6?'far_right':lx>0.2?'right':'center';} return mapToGrid(n,ic);
+}
+function eyeHalfClosed(lx=0,ly=0.5,ic=IRIS) { const g=eyeOpen(lx,ly,ic); for(let x=0;x<5;x++) g[0][x]=[...LID]; return g; }
+function eyeClosed() { return mapToGrid('closed'); }
+function eyeBlinkTop() { return mapToGrid('blink_mid'); }
+function eyeWide(lx=0,ly=0,ic=IRIS) { return mapToGrid('wide',ic); }
+function eyeSquint(lx=0,ic=IRIS) { return mapToGrid('squint',ic); }
+
+const HEART = [[0,1,0,1,0],[1,1,1,1,1],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]];
+function eyeHeart() { const g=emptyGrid(); for(let y=0;y<5;y++) for(let x=0;x<5;x++) g[y][x]=HEART[y][x]?[255,20,60]:[...LID]; return g; }
+function eyeHeartTk() { const g=emptyGrid(); for(let y=0;y<5;y++) for(let x=0;x<5;x++){if(!HEART[y][x]){g[y][x]=[...LID];continue;} const d=dist(x,y,2,2); g[y][x]=d<0.8?[...TK_CORE]:d<1.6?[...TK_MID]:[...TK_EDGE];} return g; }
+function eyeHeartTkPulse(phase) { const g=emptyGrid(),cs=[TK_CORE,TK_MID,TK_EDGE]; for(let y=0;y<5;y++) for(let x=0;x<5;x++){if(!HEART[y][x]){g[y][x]=[...LID];continue;} const d=dist(x,y,2,2),ci=(d*0.8+phase*3)%3,i=Math.floor(ci)%3,n=(i+1)%3,f=ci-Math.floor(ci); g[y][x]=[Math.round(cs[i][0]*(1-f)+cs[n][0]*f),Math.round(cs[i][1]*(1-f)+cs[n][1]*f),Math.round(cs[i][2]*(1-f)+cs[n][2]*f)];} return g; }
+function eyeX() { const g=emptyGrid(); for(let i=0;i<5;i++){g[i][i]=[...WHITE];g[i][4-i]=[...WHITE];} return g; }
+function eyeArrow(d='left') { const g=emptyGrid(),p=d==='left'?[[2,0],[1,1],[0,2],[1,3],[2,4],[2,2],[3,2],[4,2]]:[[2,0],[3,1],[4,2],[3,3],[2,4],[2,2],[1,2],[0,2]]; for(const[x,y]of p) g[y][x]=[...WHITE]; return g; }
+function eyeSupernova(phase,ic=IRIS) { const g=emptyGrid(),rr=phase*3.5; for(let y=0;y<5;y++) for(let x=0;x<5;x++){const d=dist(x,y,2,2),core=Math.max(0,1-d*0.4)*(1-phase*0.5),ring=rr>0.5?Math.max(0,1-Math.abs(d-rr)/0.8):0,i=Math.min(1,core+ring); g[y][x]=[Math.min(255,Math.round(ic[0]+(255-ic[0])*i)),Math.min(255,Math.round(ic[1]+(255-ic[1])*i*0.8)),Math.min(255,Math.round(ic[2]+(255-ic[2])*i*0.6))];} return g; }
+function eyeSpiral(phase,ic=IRIS) { const g=emptyGrid(); for(let y=0;y<5;y++) for(let x=0;x<5;x++){const dx=x-2,dy=y-2,a=Math.atan2(dy,dx),d=dist(x,y,2,2),s=Math.sin(a*2+d*2-phase*Math.PI*4),i=(s+1)/2; g[y][x]=[Math.round(ic[0]*i),Math.round(ic[1]*i),Math.round(ic[2]*i)];} return g; }
+
+// ==================== NEW PATTERN EXPRESSIONS ====================
+function eyeRipple(phase, colors=THINKOFF_PALETTE) {
+  const g=emptyGrid(), n=colors.length;
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) {
+    const d=dist(x,y,2,2), wave=Math.sin((d-phase*4)*2);
+    if(wave<0){g[y][x]=[0,0,0];}else{
+      const idx=((Math.floor((d-phase*4)*1.5)%n)+n)%n;
+      const c=colors[idx]; g[y][x]=[Math.round(c[0]*wave),Math.round(c[1]*wave),Math.round(c[2]*wave)];
+    }
+  }
+  return g;
+}
+
+function eyePlasma(phase, colors=THINKOFF_PALETTE) {
+  const g=emptyGrid(), n=colors.length, t=phase*Math.PI*2;
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) {
+    const v1=Math.sin(x*1.2+t), v2=Math.sin(y*1.4+t*0.7), v3=Math.sin(dist(x,y,2,2)*1.5-t);
+    const v=(v1+v2+v3)/3, intensity=Math.max(0,v);
+    const idx=Math.min(n-1, Math.round(Math.abs(v)*(n-1)));
+    const c=colors[idx]; g[y][x]=[Math.round(c[0]*intensity),Math.round(c[1]*intensity),Math.round(c[2]*intensity)];
+  }
+  return g;
+}
+
+function eyePinwheel(phase, colors=THINKOFF_PALETTE, arms=3) {
+  const g=emptyGrid(), n=colors.length, t=phase*Math.PI*2;
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) {
+    const a=Math.atan2(y-2,x-2)+t, wave=Math.sin(a*arms);
+    if(wave<0){g[y][x]=[0,0,0];}else{
+      const d=dist(x,y,2,2), idx=Math.floor(d*1.2)%n;
+      const c=colors[idx]; g[y][x]=[Math.round(c[0]*wave),Math.round(c[1]*wave),Math.round(c[2]*wave)];
+    }
+  }
+  return g;
+}
+
+function eyeRain(phase, colors=THINKOFF_PALETTE) {
+  const g=emptyGrid(), n=colors.length;
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) {
+    const wave=Math.sin(y*1.5+x*0.7+phase*8);
+    if(wave<0.3){g[y][x]=[0,0,0];}else{
+      const intensity=(wave-0.3)/0.7;
+      const idx=((Math.floor(y+x*0.7+phase*8)%n)+n)%n;
+      const c=colors[idx]; g[y][x]=[Math.round(c[0]*intensity),Math.round(c[1]*intensity),Math.round(c[2]*intensity)];
+    }
+  }
+  return g;
+}
+
+function eyeKaleidoscope(phase, colors=THINKOFF_PALETTE) {
+  const g=emptyGrid(), n=colors.length, t=phase*Math.PI*2;
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) {
+    const mx=Math.abs(x-2), my=Math.abs(y-2);
+    const a=Math.atan2(my,mx)+t, d=dist(mx,my,0,0);
+    const v=Math.sin(a*3+d*2), intensity=Math.max(0,v);
+    const idx=Math.min(n-1, Math.round(Math.abs(v)*(n-1)));
+    const c=colors[idx]; g[y][x]=[Math.round(c[0]*intensity),Math.round(c[1]*intensity),Math.round(c[2]*intensity)];
+  }
+  return g;
+}
+
+function eyeBreathe(phase, cA=TK_CORE, cB=TK_MAGENTA) {
+  const g=emptyGrid(), t=(Math.sin(phase*Math.PI*2)+1)/2;
+  // Breathe from dark to color
+  const c=[Math.round(cA[0]*t+cB[0]*(1-t)*t), Math.round(cA[1]*t+cB[1]*(1-t)*t), Math.round(cA[2]*t+cB[2]*(1-t)*t)];
+  for(let y=0;y<5;y++) for(let x=0;x<5;x++) g[y][x]=[...c];
+  return g;
+}
+
+// ==================== SEQUENCE BUILDERS ====================
+function seqBlink(lx=0,ly=0.5) { return [{g:eyeOpen(lx,ly),ms:50},{g:eyeBlinkTop(),ms:60},{g:eyeClosed(),ms:80},{g:eyeBlinkTop(),ms:60},{g:eyeOpen(lx,ly),ms:50}]; }
+function seqDoubleBlink() { return [...seqBlink(),{g:eyeOpen(),ms:100},...seqBlink()]; }
+function seqSlowBlink() { return [{g:eyeOpen(),ms:100},{g:eyeHalfClosed(),ms:150},{g:eyeClosed(),ms:400},{g:eyeHalfClosed(),ms:200},{g:eyeOpen(),ms:100}]; }
+function seqScanLR() { const f=[]; for(let i=0;i<60;i++) f.push({g:eyeOpen(-1+2*(i/60),0.5),ms:50}); return f; }
+function seqScanRL() { const f=[]; for(let i=0;i<60;i++) f.push({g:eyeOpen(1-2*(i/60),0.5),ms:50}); return f; }
+function seqSurprise() { const f=[{g:eyeOpen(0,0.3),ms:50},{g:eyeWide(0,0),ms:800}]; const w=eyeWide(0,0),n=eyeOpen(0,0.5); for(let i=0;i<10;i++) f.push({g:blendGrids(w,n,i/10),ms:50}); return f; }
+function seqSuspicious() { const f=[],n=eyeOpen(0,0.5),s=eyeSquint(-0.8); for(let i=0;i<15;i++) f.push({g:blendGrids(n,s,i/15),ms:60}); f.push({g:s,ms:1000}); for(let i=0;i<15;i++) f.push({g:blendGrids(s,n,i/15),ms:60}); return f; }
+function seqSupernova() { const f=[]; for(let i=0;i<40;i++) f.push({g:eyeSupernova(i/40),ms:50}); const nv=eyeSupernova(1.0),n=eyeOpen(0,0.5); for(let i=0;i<20;i++) f.push({g:blendGrids(nv,n,i/20),ms:50}); return f; }
+function seqHypnotize(ic=IRIS) { const f=[]; for(let i=0;i<100;i++) f.push({g:eyeSpiral(i/100,ic),ms:50}); return f; }
+function seqLove() { const f=[{g:eyeHeart(),ms:1500}]; const h=eyeHeart(),n=eyeOpen(0,0.5); for(let i=0;i<10;i++) f.push({g:blendGrids(h,n,i/10),ms:50}); return f; }
+function seqLoveTk() { const f=[{g:eyeHeartTk(),ms:1500}]; const h=eyeHeartTk(),n=eyeOpen(0,0.5,TK_CORE); for(let i=0;i<10;i++) f.push({g:blendGrids(h,n,i/10),ms:50}); return f; }
+function seqHeartTkPulse() { const f=[]; for(let i=0;i<75;i++) f.push({g:eyeHeartTkPulse(i/75),ms:40}); return f; }
+function seqDeath() { return [{g:eyeX(),ms:2000}]; }
+function seqWink() { return [{L:eyeOpen(),R:eyeOpen(),ms:50},{L:eyeOpen(),R:eyeClosed(),ms:300},{L:eyeOpen(),R:eyeOpen(),ms:50}]; }
+function seqIndependent() { return [{L:eyeOpen(-0.8,0.5),R:eyeOpen(0.8,0.5),ms:1500}]; }
+function seqIdleScan() { const f=[]; for(let i=0;i<30;i++) f.push({g:eyeOpen(-0.8+1.6*(i/30),0.5),ms:40}); f.push({g:eyeOpen(0.8,0.5),ms:500}); f.push(...seqBlink(0.8,0.5)); for(let i=0;i<30;i++) f.push({g:eyeOpen(0.8-1.6*(i/30),0.3),ms:40}); f.push({g:eyeOpen(-0.8,0.3),ms:800}); f.push(...seqBlink(-0.8,0.3)); for(let i=0;i<20;i++) f.push({g:eyeOpen(-0.8+1.6*(i/20),-0.3),ms:40}); f.push({g:eyeOpen(0.8,-0.3),ms:400}); f.push(...seqBlink(0,0.5)); return f; }
+
+// New pattern sequences
+function seqPattern(fn, colors, dur=100) { const f=[]; for(let i=0;i<dur;i++) f.push({g:fn(i/dur,colors),ms:50}); return f; }
+
+// ==================== TAB SWITCHING ====================
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => { if(b.textContent.toLowerCase().includes(name==='eyes'?'eyes':name==='patterns'?'pattern':'camera')) b.classList.add('active'); });
+  if (name === 'camera') startCameraPolling();
+}
+
+// ==================== CARD HELPERS ====================
+function createCard(label, sublabel, container, dual=false) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<div class="card-label">${label}</div>` +
+    `<div class="eyes">${dual?'<canvas width="120" height="120"></canvas><canvas width="120" height="120"></canvas>':'<canvas width="120" height="120"></canvas>'}</div>` +
+    (sublabel?`<div class="card-sublabel">${sublabel}</div>`:'');
+  container.appendChild(card);
+  return dual ? card.querySelectorAll('canvas') : [card.querySelector('canvas')];
+}
+function playStatic(canvas, grid) { drawGrid(canvas.getContext('2d'), grid); }
+function playSequence(canvasL, canvasR, frames, loop=true) {
+  let idx=0, lastTime=0, elapsed=0;
+  function tick(ts) {
+    if(!lastTime) lastTime=ts; elapsed+=ts-lastTime; lastTime=ts;
+    const ms=frames[idx].ms||50;
+    if(elapsed>=ms){elapsed-=ms;idx++;if(idx>=frames.length){if(loop)idx=0;else return;}}
+    const f=frames[idx]; drawGrid(canvasL.getContext('2d'),f.L||f.g);
+    if(canvasR) drawGrid(canvasR.getContext('2d'),f.R||f.g);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ==================== BUILD TAB 1: EYES ====================
+const staticEl = document.getElementById('static-expressions');
+const animEl = document.getElementById('animated-sequences');
+
+const statics = [
+  ['Open (center)','',eyeOpen(0,0.5)],['Open (left)','',eyeOpen(-1,0.5)],['Open (right)','',eyeOpen(1,0.5)],
+  ['Open (up)','',eyeOpen(0,-0.5)],['Open (down)','',eyeOpen(0,1.0)],
+  ['Up-Left','',eyeOpen(-0.5,-0.5)],['Up-Right','',eyeOpen(0.5,-0.5)],
+  ['Down-Left','',eyeOpen(-0.5,1.0)],['Down-Right','',eyeOpen(0.5,1.0)],
+  ['Half Closed','sleepy',eyeHalfClosed()],['Closed','blink',eyeClosed()],['Blink Top','mid-blink',eyeBlinkTop()],
+  ['Wide','surprised',eyeWide()],['Squint Left','',eyeSquint(-0.5)],['Squint Right','',eyeSquint(0.5)],
+  ['Heart (Red)','love',eyeHeart()],['Heart (ThinkOff)','3-zone',eyeHeartTk()],
+  ['Eyes (ThinkOff)','',eyeOpen(0,0.5,TK_CORE)],['Eyes TK Left','',eyeOpen(-1,0.5,TK_CORE)],
+  ['Eyes TK Right','',eyeOpen(1,0.5,TK_CORE)],['Wide (ThinkOff)','',eyeWide(0,0,TK_CORE)],
+  ['X (Dead)','stunned',eyeX()],['Arrow Left','',eyeArrow('left')],['Arrow Right','',eyeArrow('right')],
+];
+for(const[l,s,g]of statics){const[c]=createCard(l,s,staticEl);playStatic(c,g);}
+
+const anims = [
+  ['Blink','~300ms',seqBlink(),false],['Double Blink','~700ms',seqDoubleBlink(),false],
+  ['Slow Blink','~950ms',seqSlowBlink(),false],['Scan L\u2192R','3s',seqScanLR(),false],
+  ['Scan R\u2192L','3s',seqScanRL(),false],['Surprise','wide+settle',seqSurprise(),false],
+  ['Suspicious','squint',seqSuspicious(),false],['Supernova','burst',seqSupernova(),false],
+  ['Hypnotize','spiral',seqHypnotize(),false],['Love (Red)','heart',seqLove(),false],
+  ['Love (ThinkOff)','pink',seqLoveTk(),false],['Heart Pulse TK','cycling',seqHeartTkPulse(),false],
+  ['Death','X eyes',seqDeath(),false],['Wink','right',seqWink(),true],
+  ['Independent','chameleon',seqIndependent(),true],['Idle Scan','ambient',seqIdleScan(),false],
+];
+for(const[l,s,f,dual]of anims){if(dual){const[cL,cR]=createCard(l,s,animEl,true);playSequence(cL,cR,f);}else{const[cL]=createCard(l,s,animEl,true);const cR=cL.parentElement.parentElement.querySelectorAll('canvas')[1];playSequence(cL,cR,f);}}
+
+// ==================== COLOR SELECTOR ====================
+const colorSelEl = document.getElementById('color-selector');
+for (const [name, rgb] of Object.entries(TKAPP)) {
+  const btn = document.createElement('div');
+  btn.style.cssText = `width:40px;height:40px;border-radius:50%;cursor:pointer;border:3px solid #333;transition:all 0.2s;background:rgb(${rgb.join(',')})`;
+  btn.title = name;
+  btn.onclick = () => {
+    selectedColor = rgb;
+    document.getElementById('selected-color-name').textContent = name;
+    document.querySelectorAll('#color-selector > div').forEach(b => b.style.borderColor = '#333');
+    btn.style.borderColor = '#fff';
+    // Restart spiral preview with new color
+    startSelectedSpiral();
+  };
+  if (name === 'Fuchsia') btn.style.borderColor = '#fff';
+  colorSelEl.appendChild(btn);
+}
+
+let spiralAnimId = null;
+function startSelectedSpiral() {
+  if (spiralAnimId) cancelAnimationFrame(spiralAnimId);
+  const cL = document.getElementById('selected-spiral-L');
+  const cR = document.getElementById('selected-spiral-R');
+  let start = null;
+  function tick(ts) {
+    if (!start) start = ts;
+    const phase = ((ts - start) / 5000) % 1;
+    drawGrid(cL.getContext('2d'), eyeSpiral(phase, selectedColor));
+    drawGrid(cR.getContext('2d'), eyeSpiral(phase, selectedColor));
+    spiralAnimId = requestAnimationFrame(tick);
+  }
+  spiralAnimId = requestAnimationFrame(tick);
+}
+startSelectedSpiral();
+
+// ==================== BUILD TAB 2: PATTERNS ====================
+const tkEl = document.getElementById('patterns-tk');
+const pfEl = document.getElementById('patterns-pf');
+const miscEl = document.getElementById('patterns-misc');
+
+const tkPatterns = [
+  ['Spiral TK','hypnotic',null,TK_CORE],
+  ['Ripple','concentric rings',eyeRipple,THINKOFF_PALETTE],
+  ['Plasma','interference',eyePlasma,THINKOFF_PALETTE],
+  ['Pinwheel','starburst',eyePinwheel,THINKOFF_PALETTE],
+  ['Rain','cascade',eyeRain,THINKOFF_PALETTE],
+  ['Kaleidoscope','mirror',eyeKaleidoscope,THINKOFF_PALETTE],
+  ['Breathe','pulse',null,'breathe_tk'],
+];
+for(const[l,s,fn,c]of tkPatterns){const[cL]=createCard(l,s,tkEl,true);const cR=cL.parentElement.parentElement.querySelectorAll('canvas')[1];if(!fn&&c==='breathe_tk')playSequence(cL,cR,seqPattern((p)=>eyeBreathe(p,TK_CORE,TK_MAGENTA),null));else if(!fn)playSequence(cL,cR,seqHypnotize(c));else playSequence(cL,cR,seqPattern(fn,c));}
+
+const pfPatterns = [
+  ['Spiral PF','hypnotic',null,PINK_FUCHSIA[0]],
+  ['Ripple PF','pink-purple',eyeRipple,PINK_FUCHSIA],
+  ['Plasma PF','interference',eyePlasma,PINK_FUCHSIA],
+  ['Pinwheel PF','starburst',eyePinwheel,PINK_FUCHSIA],
+  ['Rain PF','cascade',eyeRain,PINK_FUCHSIA],
+  ['Kaleidoscope PF','mirror',eyeKaleidoscope,PINK_FUCHSIA],
+];
+for(const[l,s,fn,c]of pfPatterns){const[cL]=createCard(l,s,pfEl,true);const cR=cL.parentElement.parentElement.querySelectorAll('canvas')[1];if(!fn)playSequence(cL,cR,seqHypnotize(c));else playSequence(cL,cR,seqPattern(fn,c));}
+
+// Per-color spirals for all 8 ThinkOff.app colors
+const miscPatterns = [
+  ['Spiral Blue','classic',null,IRIS],
+];
+for(const[name,rgb]of Object.entries(TKAPP)){miscPatterns.push([`Spiral ${name}`,name.toLowerCase(),null,rgb]);}
+miscPatterns.push(['Breathe Blue-Pink','dual',null,'breathe_bp'],['Breathe Magenta-Edge','dual',null,'breathe_me']);
+for(const[l,s,fn,c]of miscPatterns){const[cL]=createCard(l,s,miscEl,true);const cR=cL.parentElement.parentElement.querySelectorAll('canvas')[1];if(c==='breathe_bp')playSequence(cL,cR,seqPattern((p)=>eyeBreathe(p,IRIS,TK_CORE),null));else if(c==='breathe_me')playSequence(cL,cR,seqPattern((p)=>eyeBreathe(p,TK_MAGENTA,TK_EDGE),null));else if(!fn)playSequence(cL,cR,seqHypnotize(c));else playSequence(cL,cR,seqPattern(fn,c));}
+
+// ==================== MOUSE TRACKER ====================
+const trackerArea=document.getElementById('tracker-area'),trackL=document.getElementById('track-L'),trackR=document.getElementById('track-R'),trackHint=document.getElementById('tracker-hint');
+function updateTracker(mx,my){const r=trackerArea.getBoundingClientRect(),xN=Math.max(0,Math.min(1,(mx-r.left)/r.width)),yN=Math.max(0,Math.min(1,(my-r.top)/r.height)),lx=(xN-0.5)*2,ly=Math.max(-0.5,Math.min(1,(yN-0.3)*1.5));drawGrid(trackL.getContext('2d'),eyeOpen(lx,ly));drawGrid(trackR.getContext('2d'),eyeOpen(lx,ly,TK_CORE));trackHint.textContent=`look: (${lx.toFixed(2)}, ${ly.toFixed(2)})`;}
+trackerArea.addEventListener('mousemove',e=>updateTracker(e.clientX,e.clientY));
+trackerArea.addEventListener('touchmove',e=>{e.preventDefault();updateTracker(e.touches[0].clientX,e.touches[0].clientY);});
+drawGrid(trackL.getContext('2d'),eyeOpen(0,0.5));
+drawGrid(trackR.getContext('2d'),eyeOpen(0,0.5,TK_CORE));
+
+function toggleStyle(){eyeStyle=eyeStyle==='nm'?'sm':'nm';document.getElementById('style-toggle').textContent=eyeStyle==='nm'?'Switch to Small Iris':'Switch to Normal Iris';rebuildStatics();}
+function rebuildStatics(){const el=document.getElementById('static-expressions');el.innerHTML='';for(const[l,s,g]of statics){const[c]=createCard(l,s,el);playStatic(c,g);}}
+
+// ==================== CAMERA CONTROL ====================
+const DETECTOR_URL = 'http://localhost:8898';
+let cameraPolling = false;
+let cameraPollTimer = null;
+
+const WEATHER_ICONS = {clear:'\u2600\uFE0F',cloudy:'\u2601\uFE0F',rain:'\uD83C\uDF27\uFE0F',snow:'\u2744\uFE0F',storm:'\u26A1',fog:'\uD83C\uDF2B\uFE0F'};
+const ANIM_OPTIONS = ['track','idle_scan','love','surprise','hypnotize','ripple','plasma','pinwheel','rain','kaleidoscope','breathe','blackout','weather_mood'];
+
+let webrtcPc = null;
+
+async function startWebRTC() {
+  const saved = JSON.parse(localStorage.getItem('detector_settings') || '{}');
+  const HA_TOKEN = saved.ha_token || document.getElementById('cfg-ha-token')?.value || '';
+  const entity = saved.camera_entity || 'camera.tyohuone_camera';
+  if (!HA_TOKEN) {
+    document.getElementById('detection-log').textContent = 'Set HA token in settings below to see camera';
+    return;
+  }
+  try {
+    const ws = new WebSocket('ws://localhost:8123/api/websocket');
+    const msgId = 10;
+    ws.onmessage = async (evt) => {
+      const msg = JSON.parse(evt.data);
+      if (msg.type === 'auth_required') {
+        ws.send(JSON.stringify({type: 'auth', access_token: HA_TOKEN}));
+      } else if (msg.type === 'auth_ok') {
+        const pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+        webrtcPc = pc;
+        // Nest requires audio + video + datachannel
+        pc.addTransceiver('audio', {direction: 'recvonly'});
+        pc.addTransceiver('video', {direction: 'recvonly'});
+        pc.createDataChannel('dataSendChannel');
+        pc.ontrack = (ev) => {
+          if (ev.track.kind === 'video') {
+            document.getElementById('camera-video').srcObject = ev.streams[0];
+          }
+        };
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await new Promise(r => {
+          if (pc.iceGatheringState === 'complete') return r();
+          pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') r(); });
+          setTimeout(r, 3000);
+        });
+        ws.send(JSON.stringify({id: msgId, type: 'camera/webrtc/offer', entity_id: entity, offer: pc.localDescription.sdp}));
+      } else if (msg.id === msgId && msg.event?.answer) {
+        await webrtcPc.setRemoteDescription({type: 'answer', sdp: msg.event.answer});
+        document.getElementById('detection-log').textContent = 'Camera connected via WebRTC';
+      } else if (msg.id === msgId && msg.event?.type === 'error') {
+        document.getElementById('detection-log').textContent = 'WebRTC: ' + (msg.event.message || 'failed');
+      }
+    };
+    ws.onerror = () => {
+      document.getElementById('detection-log').textContent = 'Cannot connect to HA websocket';
+    };
+  } catch(e) {
+    document.getElementById('detection-log').textContent = 'WebRTC error: ' + e.message;
+  }
+}
+
+function startCameraPolling() {
+  if (cameraPolling) return;
+  cameraPolling = true;
+  loadSettings();
+  startWebRTC();
+  pollDetector();
+  // Send 1080p frames to detector for YOLO
+  setInterval(sendFrameToDetector, 500);
+}
+
+async function sendFrameToDetector() {
+  const video = document.getElementById('camera-video');
+  if (!video || !video.srcObject || video.videoWidth === 0) return;
+  const canvas = document.getElementById('camera-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    try {
+      await fetch(DETECTOR_URL + '/frame', { method: 'POST', body: blob });
+    } catch(e) {}
+  }, 'image/jpeg', 0.85);
+}
+
+async function pollDetector() {
+  if (!cameraPolling) return;
+  try {
+    const r = await fetch(DETECTOR_URL + '/status');
+    const d = await r.json();
+    document.getElementById('conn-dot').className = 'status-dot on';
+    document.getElementById('conn-status').textContent = 'connected';
+    document.getElementById('anim-name').textContent = d.active_animation || '--';
+    document.getElementById('sched-active').textContent = d.is_active ? 'YES' : 'no (outside schedule)';
+    document.getElementById('frame-count').textContent = d.frames_sent;
+    const m = Math.floor(d.uptime_sec/60), h = Math.floor(m/60);
+    document.getElementById('uptime').textContent = h>0 ? `${h}h ${m%60}m` : `${m}m`;
+
+    if (d.sun_times) {
+      document.getElementById('sun-rise').textContent = d.sun_times.sunrise || '--';
+      document.getElementById('sun-set').textContent = d.sun_times.sunset || '--';
+    }
+    if (d.weather) {
+      const mood = d.weather.mood || 'clear';
+      document.getElementById('weather-icon').textContent = WEATHER_ICONS[mood] || '--';
+      document.getElementById('weather-mood').textContent = mood;
+      document.getElementById('weather-temp').textContent = d.weather.temperature != null ? d.weather.temperature + '\u00B0C' : '--';
+    }
+
+    // Detection log + overlay
+    const log = document.getElementById('detection-log');
+    if (d.detections && d.detections.length > 0) {
+      log.textContent = d.detections.map(det => `${det.moving !== false ? '\u25B6' : '\u2759'} ${det.label} (${(det.confidence*100).toFixed(0)}%) ${det.moving !== false ? 'MOVING' : 'static'}`).join('\n');
+    } else {
+      log.textContent = 'No detections';
+    }
+    drawDetectionOverlay(d.detections || [], d.frame_size);
+
+    // Update blinder preview based on animation
+    updateBlinderPreview(d);
+  } catch(e) {
+    document.getElementById('conn-dot').className = 'status-dot off';
+    document.getElementById('conn-status').textContent = 'disconnected';
+  }
+  setTimeout(pollDetector, 2000);
+}
+
+async function pollSnapshot() {
+  if (!cameraPolling) return;
+  try {
+    const r = await fetch(DETECTOR_URL + '/snapshot');
+    if (r.ok) {
+      const blob = await r.blob();
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('camera-canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(blob);
+    }
+  } catch(e) {}
+  setTimeout(pollSnapshot, 2000);
+}
+
+const DET_COLORS = {person:'#00ff00',car:'#ffaa00',truck:'#ffaa00',bicycle:'#00ccff',dog:'#ff44ff',cat:'#ff44ff',bird:'#44ffaa'};
+function drawDetectionOverlay(detections, frameSize) {
+  const video = document.getElementById('camera-video');
+  const overlay = document.getElementById('detection-overlay');
+  if (!overlay || !video) return;
+  const vw = video.videoWidth || 1920;
+  const vh = video.videoHeight || 1080;
+  overlay.width = vw;
+  overlay.height = vh;
+  // YOLO runs on a different resolution than the video stream
+  const fw = frameSize ? frameSize[0] : vw;
+  const fh = frameSize ? frameSize[1] : vh;
+  const sx = vw / fw;  // scale factor
+  const sy = vh / fh;
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0, 0, vw, vh);
+  for (const det of detections) {
+    const [x1, y1, x2, y2] = [det.bbox[0]*sx, det.bbox[1]*sy, det.bbox[2]*sx, det.bbox[3]*sy];
+    const w = x2 - x1, h = y2 - y1;
+    const isMoving = det.moving !== false;
+    const color = DET_COLORS[det.label] || '#ffffff';
+    // Box - always colored, thicker when moving
+    ctx.globalAlpha = isMoving ? 1.0 : 0.6;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isMoving ? 3 : 2;
+    if (!isMoving) { ctx.setLineDash([6, 4]); } else { ctx.setLineDash([]); }
+    ctx.strokeRect(x1, y1, w, h);
+    ctx.setLineDash([]);
+    // Label
+    const tag = isMoving ? '\u25B6 ' : '';
+    const label = `${tag}${det.label} ${(det.confidence*100).toFixed(0)}%`;
+    ctx.font = 'bold 14px sans-serif';
+    const tm = ctx.measureText(label);
+    const lh = 20;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = isMoving ? 0.9 : 0.5;
+    ctx.fillRect(x1, y1 - lh, tm.width + 8, lh);
+    ctx.globalAlpha = 1.0;
+    ctx.fillStyle = '#000';
+    ctx.fillText(label, x1 + 4, y1 - 5);
+    // Center dot (moving only)
+    if (isMoving) {
+      ctx.beginPath();
+      ctx.arc(det.center[0] * fw * sx, det.center[1] * fh * sy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+function updateBlinderPreview(status) {
+  const bL = document.getElementById('blinder-L');
+  const bR = document.getElementById('blinder-R');
+  // Show eye tracking if there's a person detection with center coords
+  const det = status.detections && status.detections[0];
+  if (det && det.center) {
+    const lx = (det.center[0] - 0.5) * 2;
+    const ly = Math.max(-0.5, Math.min(1, (det.center[1] - 0.3) * 1.5));
+    drawGrid(bL.getContext('2d'), eyeOpen(lx, ly));
+    drawGrid(bR.getContext('2d'), eyeOpen(lx, ly, TK_CORE));
+  } else {
+    drawGrid(bL.getContext('2d'), eyeOpen(0, 0.5));
+    drawGrid(bR.getContext('2d'), eyeOpen(0, 0.5, TK_CORE));
+  }
+}
+
+// ==================== SETTINGS ====================
+const DEFAULT_MAPPINGS = {
+  person:{animation:'track',priority:1},dog:{animation:'love',priority:2},cat:{animation:'love',priority:2},
+  car:{animation:'track',priority:3},truck:{animation:'track',priority:3},bicycle:{animation:'track',priority:3},
+  bird:{animation:'surprise',priority:4},default:{animation:'idle_scan',priority:99},
+  nothing:{animation:'weather_mood',after_seconds:10}
+};
+
+function loadSettings() {
+  const saved = localStorage.getItem('detector_settings');
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      if(cfg.ha_url) document.getElementById('cfg-ha-url').value = cfg.ha_url;
+      if(cfg.ha_token) document.getElementById('cfg-ha-token').value = cfg.ha_token;
+      if(cfg.camera_entity) document.getElementById('cfg-camera').value = cfg.camera_entity;
+      if(cfg.poll_interval_sec) { document.getElementById('cfg-poll').value = cfg.poll_interval_sec; document.getElementById('poll-val').textContent = cfg.poll_interval_sec; }
+      if(cfg.min_confidence) { document.getElementById('cfg-confidence').value = cfg.min_confidence; document.getElementById('conf-val').textContent = cfg.min_confidence; }
+      if(cfg.brightness) { const pct = cfg.brightness * 100; document.getElementById('cfg-brightness').value = pct; document.getElementById('bright-val').textContent = pct; }
+      if(cfg.always_on) document.getElementById('cfg-always-on').checked = cfg.always_on;
+      if(cfg.weather_reactive !== undefined) document.getElementById('cfg-weather').checked = cfg.weather_reactive;
+      if(cfg.schedule && cfg.schedule[0]) {
+        document.getElementById('cfg-sched-start').value = cfg.schedule[0].start || '';
+        document.getElementById('cfg-sched-end').value = cfg.schedule[0].end || '';
+      }
+      buildMappingTable(cfg.mappings || DEFAULT_MAPPINGS);
+      return;
+    } catch(e) {}
+  }
+  buildMappingTable(DEFAULT_MAPPINGS);
+}
+
+function buildMappingTable(mappings) {
+  const body = document.getElementById('mapping-body');
+  body.innerHTML = '';
+  for (const [obj, cfg] of Object.entries(mappings)) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${obj}</td>
+      <td><select class="map-anim" data-obj="${obj}">${ANIM_OPTIONS.map(a=>`<option value="${a}"${a===(cfg.animation||'idle_scan')?' selected':''}>${a}</option>`).join('')}</select></td>
+      <td>${cfg.priority||cfg.after_seconds||'--'}</td>`;
+    body.appendChild(tr);
+  }
+}
+
+async function saveConfig() {
+  const cfg = {
+    ha_url: document.getElementById('cfg-ha-url').value,
+    ha_token: document.getElementById('cfg-ha-token').value,
+    camera_entity: document.getElementById('cfg-camera').value,
+    poll_interval_sec: parseFloat(document.getElementById('cfg-poll').value),
+    min_confidence: parseFloat(document.getElementById('cfg-confidence').value),
+    brightness: parseFloat(document.getElementById('cfg-brightness').value) / 100,
+    always_on: document.getElementById('cfg-always-on').checked,
+    weather_reactive: document.getElementById('cfg-weather').checked,
+    max_on_minutes: parseInt(document.getElementById('cfg-maxon').value),
+    cooldown_minutes: parseInt(document.getElementById('cfg-cooldown').value),
+    schedule: [{
+      start: document.getElementById('cfg-sched-start').value,
+      end: document.getElementById('cfg-sched-end').value
+    }],
+    mappings: {}
+  };
+
+  // Collect mappings from table
+  document.querySelectorAll('.map-anim').forEach(sel => {
+    const obj = sel.dataset.obj;
+    const existing = DEFAULT_MAPPINGS[obj] || {};
+    cfg.mappings[obj] = { ...existing, animation: sel.value };
+  });
+
+  // Save to localStorage
+  localStorage.setItem('detector_settings', JSON.stringify(cfg));
+
+  // Try to POST to detector
+  try {
+    await fetch(DETECTOR_URL + '/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(cfg)
+    });
+    alert('Settings saved to detector');
+  } catch(e) {
+    alert('Saved locally (detector not reachable)');
+  }
+}
+
+// Init blinder previews
+drawGrid(document.getElementById('blinder-L').getContext('2d'), eyeOpen(0, 0.5));
+drawGrid(document.getElementById('blinder-R').getContext('2d'), eyeOpen(0, 0.5, TK_CORE));
+
+// ==================== TEXT SCROLL PREVIEW ====================
+const FONT_5X = {
+  'A':[[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],'B':[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],
+  'C':[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],'D':[[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
+  'E':[[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,1,1]],'F':[[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],
+  'G':[[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],'H':[[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+  'I':[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],'J':[[0,0,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
+  'K':[[1,0,1],[1,1,0],[1,0,0],[1,1,0],[1,0,1]],'L':[[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
+  'M':[[1,0,0,0,1],[1,1,0,1,1],[1,0,1,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+  'N':[[1,0,0,1],[1,1,0,1],[1,0,1,1],[1,0,0,1],[1,0,0,1]],
+  'O':[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],'P':[[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],
+  'Q':[[0,1,0],[1,0,1],[1,0,1],[1,1,0],[0,1,1]],'R':[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+  'S':[[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],'T':[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+  'U':[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],'V':[[1,0,1],[1,0,1],[1,0,1],[0,1,0],[0,1,0]],
+  'W':[[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[1,1,0,1,1],[1,0,0,0,1]],
+  'X':[[1,0,1],[0,1,0],[0,1,0],[0,1,0],[1,0,1]],'Y':[[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],
+  'Z':[[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
+  '0':[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],'1':[[0,1,0],[1,1,0],[0,1,0],[0,1,0],[1,1,1]],
+  '2':[[1,1,0],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],'3':[[1,1,0],[0,0,1],[0,1,0],[0,0,1],[1,1,0]],
+  '4':[[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],'5':[[1,1,1],[1,0,0],[1,1,0],[0,0,1],[1,1,0]],
+  '6':[[0,1,1],[1,0,0],[1,1,0],[1,0,1],[0,1,0]],'7':[[1,1,1],[0,0,1],[0,1,0],[0,1,0],[0,1,0]],
+  '8':[[0,1,0],[1,0,1],[0,1,0],[1,0,1],[0,1,0]],'9':[[0,1,0],[1,0,1],[0,1,1],[0,0,1],[1,1,0]],
+  ' ':[[0,0],[0,0],[0,0],[0,0],[0,0]],'!':[[1],[1],[1],[0],[1]],
+  '?':[[1,1,0],[0,0,1],[0,1,0],[0,0,0],[0,1,0]],'.':[[0],[0],[0],[0],[1]],
+  '-':[[0,0,0],[0,0,0],[1,1,1],[0,0,0],[0,0,0]],':':[[0],[0],[1],[0],[1]],
+};
+
+function textToCols(text) {
+  const cols=[];
+  for(const ch of text.toUpperCase()){
+    const gl=FONT_5X[ch]||FONT_5X[' '];
+    if(gl){const w=gl[0].length; for(let c=0;c<w;c++) cols.push(gl.map(r=>r[c])); cols.push([0,0,0,0,0]);}
+  }
+  return cols;
+}
+
+function eyeScrollText(text, offset, color) {
+  const g=emptyGrid(), cols=textToCols(text), n=cols.length;
+  if(!n) return g;
+  for(let x=0;x<5;x++){const ci=((offset+x)%n+n)%n; for(let y=0;y<5;y++) if(cols[ci][y]) g[y][x]=[...color];}
+  return g;
+}
+
+let msgAnimId=null;
+function startMsgPreview() {
+  if(msgAnimId) cancelAnimationFrame(msgAnimId);
+  const text=document.getElementById('msg-text').value||'HI';
+  const colorStr=document.getElementById('msg-color').value;
+  const color=colorStr.split(',').map(Number);
+  const cL=document.getElementById('msg-preview-L'), cR=document.getElementById('msg-preview-R');
+  let start=null;
+  function tick(ts){
+    if(!start) start=ts;
+    const offset=Math.floor((ts-start)/150);
+    drawGrid(cL.getContext('2d'), eyeScrollText(text,offset,color));
+    drawGrid(cR.getContext('2d'), eyeScrollText(text,offset,color));
+    msgAnimId=requestAnimationFrame(tick);
+  }
+  msgAnimId=requestAnimationFrame(tick);
+}
+
+document.getElementById('msg-text').addEventListener('input', startMsgPreview);
+document.getElementById('msg-color').addEventListener('change', startMsgPreview);
+startMsgPreview();
+
+async function sendMessage() {
+  const text=document.getElementById('msg-text').value;
+  const colorStr=document.getElementById('msg-color').value;
+  const color=colorStr.split(',').map(Number);
+  if(!text){alert('Enter a message first');return;}
+  try {
+    await fetch(DETECTOR_URL+'/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,color})});
+    alert('Message sent to blinders!');
+  } catch(e) {alert('Detector not reachable');}
+}
+</script>
+</body>
+</html>

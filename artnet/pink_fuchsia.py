@@ -66,7 +66,7 @@ try:
             subnet = (ub >> 4) & 0xF
             uni = ub & 0xF
 
-            if subnet == 1 and uni == 14:
+            if subnet == 1 and uni in (14, 15):
                 dmx = dmx_rgb  # blinders OFF
             elif subnet == 0 and uni == 13:
                 dmx = dmx_spots
