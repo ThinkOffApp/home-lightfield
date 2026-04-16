@@ -1,0 +1,99 @@
+{
+  "ha_url": "http://localhost:8123",
+  "ha_token": "",
+  "camera_entity": "camera.alakerta_kamera",
+  "cameras": {
+    "camera.tyohuone_camera": "Office",
+    "camera.alakerta_kamera": "Ground Floor",
+    "camera.entryway_doorbell": "Doorbell"
+  },
+  "poll_interval_sec": 1.5,
+  "min_confidence": 0.25,
+  "min_area": 0.0005,
+  "location": {
+    "lat": 60.17,
+    "lon": 24.94
+  },
+  "schedule": [
+    {
+      "start": "sunset-10m",
+      "end": "sunset+60m"
+    }
+  ],
+  "always_on": false,
+  "weather_reactive": true,
+  "idle_timeout_sec": 10,
+  "max_on_minutes": 5,
+  "cooldown_minutes": 10,
+  "brightness": 0.5,
+  "mappings": {
+    "person": {
+      "animation": "track",
+      "priority": 1
+    },
+    "dog": {
+      "animation": "love",
+      "priority": 2
+    },
+    "cat": {
+      "animation": "love",
+      "priority": 2
+    },
+    "car": {
+      "animation": "track",
+      "priority": 3
+    },
+    "truck": {
+      "animation": "track",
+      "priority": 3
+    },
+    "bicycle": {
+      "animation": "track",
+      "priority": 3
+    },
+    "bird": {
+      "animation": "surprise",
+      "priority": 4
+    },
+    "default": {
+      "animation": "idle_scan",
+      "priority": 99
+    },
+    "nothing": {
+      "animation": "weather_mood",
+      "after_seconds": 10
+    }
+  },
+  "weather_moods": {
+    "clear": {
+      "animation": "breathe",
+      "colors": "thinkoff",
+      "speed": 0.5
+    },
+    "cloudy": {
+      "animation": "breathe",
+      "colors": "thinkoff_muted",
+      "speed": 0.3
+    },
+    "rain": {
+      "animation": "rain",
+      "colors": "blue",
+      "speed": 1.0
+    },
+    "snow": {
+      "animation": "kaleidoscope",
+      "colors": "ice",
+      "speed": 0.3
+    },
+    "storm": {
+      "animation": "pinwheel",
+      "colors": "pink_fuchsia",
+      "speed": 2.0
+    },
+    "fog": {
+      "animation": "breathe",
+      "colors": "white_dim",
+      "speed": 0.2
+    }
+  }
+}
