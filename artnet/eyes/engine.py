@@ -118,24 +118,35 @@ _empty = bytearray(512)
 
 _DELL_RELAY = os.environ.get('ARTNET_RELAY', '192.168.50.217')
 _DELL_RELAY_PORT = 6455
+_relay_fail_count = 0
 
 
 def send_frame(sock, left_dmx, right_dmx):
     """Send Art-Net DMX to both blinders.
 
-    Delivery strategy:
-    1. Via Dell relay (Mac -> Dell WiFi:6455 -> Dell rebroadcasts on 2.x Art-Net)
-    2. Direct unicast/broadcast (works when running on Dell itself)
-    3. Keepalive to chain node
+    Delivery strategy — auto-detects environment:
+    - If ARTNET_RELAY is set or Dell is reachable: send via relay (Mac mode)
+    - If bound to Art-Net NIC (2.x.x.x): unicast directly to ODE nodes (Dell mode)
+    - Relay only forwards to blinder ODEs (uni 14/15), spots stay off
     """
+    global _relay_fail_count
     right_pkt = _build_artnet_packet(RIGHT_UNIVERSE, right_dmx)
     left_pkt = _build_artnet_packet(LEFT_UNIVERSE, left_dmx)
 
-    # Send via Dell relay ONLY — relay unicasts to blinder ODEs,
-    # no broadcast so spots stay off
+    # 1. Try Dell relay (primary path when running on Mac)
     try:
         sock.sendto(right_pkt, (_DELL_RELAY, _DELL_RELAY_PORT))
         sock.sendto(left_pkt, (_DELL_RELAY, _DELL_RELAY_PORT))
+        _relay_fail_count = 0
+    except OSError as e:
+        _relay_fail_count += 1
+        if _relay_fail_count == 1 or _relay_fail_count % 500 == 0:
+            print(f'Art-Net relay send failed ({_relay_fail_count}x): {e}')
+
+    # 2. Direct unicast to ODE nodes (works when running on Dell with Art-Net NIC)
+    try:
+        sock.sendto(right_pkt, (RIGHT_NODE, 6454))
+        sock.sendto(left_pkt, (LEFT_NODE, 6454))
     except OSError:
         pass
 

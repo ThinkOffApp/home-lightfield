@@ -344,17 +344,3 @@ def scroll_text(text, color=TK_CORE, speed_ms=150, loops=2):
         for offset in range(total):
             left, right = eye_scroll_text_wide(text, offset, color)
             yield (left, right, speed_ms)
-
-
-# Camera event triggers - map detected events to expressions
-CAMERA_REACTIONS = {
-    'person_enter':     lambda: surprise(0, 0.3),
-    'person_left':      lambda: look_left_to_right(2.0),
-    'person_right':     lambda: look_right_to_left(2.0),
-    'car_passing':      lambda: track_object(-1.0, 1.0, 0.6, 1.5),
-    'dog':              lambda: love(),
-    'bird':             lambda: surprise(0, -0.3),
-    'package_left':     lambda: suspicious('down'),
-    'loud_noise':       lambda: eye_wide(0, 0),
-    'nothing_happening': lambda: idle_scan(30.0),
-}

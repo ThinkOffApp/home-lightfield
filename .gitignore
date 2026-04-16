@@ -1,0 +1,20 @@
+# Secrets
+.env
+*.env
+
+# YOLO model weights (large binary files)
+*.pt
+
+# Python
+__pycache__/
+*.pyc
+
+# Backups
+*.bak
+*.bak2
+
+# OS
+.DS_Store
+
+# Resolume project data (large, local-only)
+resolume-data/

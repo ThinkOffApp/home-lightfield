@@ -35,6 +35,16 @@ import websockets
 from astral.sun import sun
 from ultralytics import YOLO
 
+# Load .env file if present (for HA_TOKEN etc.)
+_env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _k, _v = _line.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 sys.path.insert(0, os.path.dirname(__file__))
 from grid import Grid
 from expressions import *
@@ -423,6 +433,9 @@ RELEVANT_CLASSES = {
     'sports ball', 'kite', 'frisbee',
 }
 
+# Living things are reported even when static (a person standing still is interesting)
+LIVING = {'person', 'dog', 'cat', 'bird', 'horse'}
+
 
 def detect_objects(image, min_confidence=0.25, min_area=0.0005):
     """Run YOLO detection on PIL Image. Returns list of detections."""
@@ -594,7 +607,6 @@ def pick_animation(detections, cfg, weather_mood, last_detection_time):
     now = time.time()
 
     # React to moving objects + static living things
-    LIVING = {'person', 'dog', 'cat', 'bird', 'horse'}
     interesting = [d for d in detections
                    if d.get('moving', False) or d['label'] in LIVING]
 
@@ -674,6 +686,7 @@ class DetectorState:
         self.snapshot_jpeg = None
         self.browser_frame = None
         self.annotated_jpeg = None
+        self.frame_size = None
         self.uptime_start = time.time()
         self.frames_sent = 0
         self.last_detection_time = 0
@@ -699,7 +712,7 @@ class DetectorState:
                 'camera': self.config.get('camera_entity', ''),
                 'schedule': self.config.get('schedule', []),
                 'always_on': self.config.get('always_on', False),
-                'frame_size': getattr(self, 'frame_size', None),
+                'frame_size': self.frame_size,
             }
 
 STATE = DetectorState()
@@ -839,6 +852,7 @@ def start_api_server(port=8898):
 def main():
     config_path = CONFIG_PATH
     dry_run = '--dry-run' in sys.argv
+    verbose = '--verbose' in sys.argv or '-v' in sys.argv
     if '--config' in sys.argv:
         idx = sys.argv.index('--config')
         config_path = sys.argv[idx + 1]
@@ -847,7 +861,7 @@ def main():
     STATE.config = cfg
 
     ha_url = cfg['ha_url']
-    ha_token = cfg['ha_token']
+    ha_token = os.environ.get('HA_TOKEN') or cfg.get('ha_token', '')
     camera = cfg['camera_entity']
     lat = cfg['location']['lat']
     lon = cfg['location']['lon']
@@ -976,7 +990,7 @@ def main():
             # Track motion - mark each detection as moving or static
             _motion_tracker.update(detections)
 
-            if detections:
+            if detections and verbose:
                 summary = ', '.join(f'{d["label"]}:{"M" if d.get("moving") else "S"}' for d in detections)
                 print(f'  [{len(detections)}] {summary}')
 
@@ -985,8 +999,7 @@ def main():
             if moving:
                 last_detection_time = time.time()
 
-            # Report moving objects + static living things (person/dog/cat/bird)
-            LIVING = {'person', 'dog', 'cat', 'bird', 'horse'}
+            # Report moving objects + static living things
             moving_dets = [d for d in detections
                            if d.get('moving', False) or d['label'] in LIVING]
             with STATE.lock:
