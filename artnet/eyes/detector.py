@@ -68,9 +68,12 @@ def load_config(path=None):
         return json.load(f)
 
 def save_config(cfg, path=None):
+    """Save config to disk, stripping ha_token (keep secrets in .env only)."""
     p = path or CONFIG_PATH
+    clean = dict(cfg)
+    clean['ha_token'] = ''  # never write token to disk
     with open(p, 'w') as f:
-        json.dump(cfg, f, indent=2)
+        json.dump(clean, f, indent=2)
 
 # ---------------------------------------------------------------------------
 # Sun schedule
@@ -203,7 +206,8 @@ def get_weather_sequence(mood_name, moods_cfg):
     color_key = mood.get('colors', 'thinkoff')
     speed = mood.get('speed', 0.5)
     colors = MOOD_COLORS.get(color_key, THINKOFF_PALETTE)
-    dur = 8.0 / max(0.1, speed)
+    # Much slower — breathe should take 30-60s per cycle, not 8s
+    dur = 60.0 / max(0.1, speed)
 
     if anim == 'breathe':
         c_a = colors[0] if colors else TK_CORE
@@ -638,36 +642,54 @@ def pick_animation(detections, cfg, weather_mood, last_detection_time):
     return best_anim, best['center'], best
 
 
+_hypnotic_cycle_idx = 0
+
 def build_animation_sequence(anim_name, center, cfg, weather_mood):
     """Build an animation generator from name + detection position."""
+    global _hypnotic_cycle_idx
     moods_cfg = cfg.get('weather_moods', {})
 
     if anim_name == 'track' and center:
         x_norm, y_norm = center
-        return [
-            (look_at_xy(x_norm, y_norm), look_at_xy(x_norm, y_norm), 50)
-        ]
+        # Build a smooth 1-second hold so eye moves smoothly to new positions
+        look = look_at_xy(x_norm, y_norm, iris_color=TK_CORE)
+        return [(look, look, 50)] * 20
     elif anim_name == 'love':
         return list(love())
     elif anim_name == 'surprise':
         return list(surprise())
     elif anim_name == 'idle_scan':
-        return list(idle_scan(5.0))
+        return list(idle_scan(30.0, iris_color=TK_CORE))
     elif anim_name == 'weather_mood':
         return list(get_weather_sequence(weather_mood, moods_cfg))
     elif anim_name == 'blackout':
         g = Grid()
         return [(g, g, 100)]
     elif anim_name == 'hypnotize':
-        return list(hypnotize(5.0))
+        return list(hypnotize(12.0, TK_CORE))
     elif anim_name == 'ripple':
-        return list(ripple(5.0))
+        return list(ripple(12.0, THINKOFF_PALETTE))
     elif anim_name == 'plasma':
-        return list(plasma(5.0))
+        return list(plasma(12.0, PINK_FUCHSIA))
     elif anim_name == 'pinwheel':
-        return list(pinwheel(5.0))
+        return list(pinwheel(12.0, THINKOFF_PALETTE))
+    elif anim_name == 'kaleidoscope':
+        return list(kaleidoscope(12.0, THINKOFF_PALETTE))
     elif anim_name == 'breathe':
-        return list(breathe(5.0))
+        return list(breathe(30.0, TK_CORE, TK_MAGENTA))
+    elif anim_name == 'hypnotic_mix':
+        # Cycle through hypnotic animations, each for ~15s, then next call gets next
+        anims = [
+            lambda: hypnotize(15.0, TK_MAGENTA),
+            lambda: plasma(15.0, PINK_FUCHSIA),
+            lambda: ripple(15.0, THINKOFF_PALETTE),
+            lambda: kaleidoscope(15.0, THINKOFF_PALETTE),
+            lambda: pinwheel(15.0, THINKOFF_PALETTE),
+            lambda: hypnotize(15.0, TK_CORE),
+        ]
+        seq = list(anims[_hypnotic_cycle_idx % len(anims)]())
+        _hypnotic_cycle_idx += 1
+        return seq
     else:
         return list(idle_scan(5.0))
 
@@ -692,6 +714,9 @@ class DetectorState:
         self.last_detection_time = 0
         self.config = {}
         self.pending_message = None  # text to scroll on blinders
+        # Live grid state for preview (what the blinders are actually showing)
+        self.current_left_grid = None   # 5x5 list of [r,g,b]
+        self.current_right_grid = None
 
     def to_dict(self):
         with self.lock:
@@ -713,6 +738,8 @@ class DetectorState:
                 'schedule': self.config.get('schedule', []),
                 'always_on': self.config.get('always_on', False),
                 'frame_size': self.frame_size,
+                'left_grid': self.current_left_grid,
+                'right_grid': self.current_right_grid,
             }
 
 STATE = DetectorState()
@@ -902,10 +929,6 @@ def main():
     weather_mood = weather.get('mood', 'clear') if weather else 'clear'
 
     last_detection_time = time.time()
-    current_sequence = None
-    seq_idx = 0
-    last_frame_time = 0
-    frame_ms = 50
 
     # Safety: prevent overheating - blinders auto-off after max_on_minutes
     blinders_on_since = None  # timestamp when blinders last turned on
@@ -915,6 +938,105 @@ def main():
     print(f'Location: {lat}, {lon} (Helsinki)')
     print(f'Weather: {weather_mood}')
     print(f'Dry run: {dry_run}')
+
+    # -------------------------------------------------------------------
+    # Art-Net playback thread: runs at 25fps independent of YOLO
+    # -------------------------------------------------------------------
+    _playback_lock = threading.Lock()
+    _playback_sequence = []  # current animation frames
+    _playback_idx = 0
+    _playback_anim = 'idle'
+    _playback_active = True  # whether blinders should be on
+    _playback_brightness = cfg.get('brightness', BRIGHTNESS)
+    _playback_stop = False
+
+    def artnet_playback():
+        nonlocal _playback_sequence, _playback_idx, _playback_stop
+        frame_interval = 1.0 / FPS
+        last_dmx = None
+
+        while not _playback_stop:
+            with _playback_lock:
+                seq = _playback_sequence
+                idx = _playback_idx
+                active = _playback_active
+                br = _playback_brightness
+
+            if not active or not seq:
+                # Send blackout at low rate to keep nodes from timeout-blinking
+                if sock and not dry_run:
+                    g = Grid()
+                    dmx_l, dmx_r = build_dmx_frames(g, g, 0)
+                    send_frame(sock, dmx_l, dmx_r)
+                black = [[[0, 0, 0] for _ in range(5)] for _ in range(5)]
+                with STATE.lock:
+                    STATE.current_left_grid = black
+                    STATE.current_right_grid = black
+                time.sleep(0.2)
+                continue
+
+            if idx < len(seq):
+                left_grid, right_grid, frame_ms = seq[idx]
+                left_dmx, right_dmx = build_dmx_frames(left_grid, right_grid, br)
+                last_dmx = (left_dmx, right_dmx)
+                if sock and not dry_run:
+                    send_frame(sock, left_dmx, right_dmx)
+                    with STATE.lock:
+                        STATE.frames_sent += 1
+                # Expose actual grid state to preview (applying brightness)
+                with STATE.lock:
+                    STATE.current_left_grid = [
+                        [[int(c * br) for c in left_grid.pixels[y][x]]
+                         for x in range(5)] for y in range(5)
+                    ]
+                    STATE.current_right_grid = [
+                        [[int(c * br) for c in right_grid.pixels[y][x]]
+                         for x in range(5)] for y in range(5)
+                    ]
+
+                with _playback_lock:
+                    _playback_idx += 1
+                    if _playback_idx >= len(_playback_sequence):
+                        # Loop loopable ambient animations
+                        if _playback_anim in ('weather_mood', 'breathe',
+                                              'idle_scan', 'blackout',
+                                              'hypnotize', 'ripple', 'plasma',
+                                              'pinwheel', 'kaleidoscope'):
+                            _playback_idx = 0
+                        elif _playback_anim == 'hypnotic_mix':
+                            # Signal main loop to rebuild with next anim in cycle
+                            _playback_idx = -1
+                        # For one-shot anims, keep last frame
+            elif last_dmx:
+                # Sequence ended, keep sending last frame to prevent timeout
+                if sock and not dry_run:
+                    send_frame(sock, last_dmx[0], last_dmx[1])
+
+            time.sleep(frame_interval)
+
+    playback_thread = threading.Thread(target=artnet_playback, daemon=True)
+    playback_thread.start()
+    print(f'Art-Net playback thread started ({FPS}fps)')
+
+    def set_animation(name, sequence, brightness=None):
+        nonlocal _playback_sequence, _playback_idx, _playback_anim
+        nonlocal _playback_brightness
+        with _playback_lock:
+            _playback_sequence = sequence
+            _playback_idx = 0
+            _playback_anim = name
+            if brightness is not None:
+                _playback_brightness = brightness
+        with STATE.lock:
+            STATE.active_animation = name
+
+    def set_playback_active(active):
+        nonlocal _playback_active, _playback_brightness
+        with _playback_lock:
+            _playback_active = active
+            # Refresh brightness from current config each cycle
+            _playback_brightness = cfg.get('brightness', BRIGHTNESS)
+
     print('Starting detection loop...')
 
     try:
@@ -938,33 +1060,29 @@ def main():
                 STATE.weather = weather or {}
 
             # Check schedule
+            cfg = STATE.config
             active = is_active_now(cfg, sun_times)
             with STATE.lock:
                 STATE.is_active = active
 
             if not active:
-                # Outside active window: blackout blinders but still fetch camera
-                if sock and not dry_run:
-                    dmx_blackout(sock)
+                set_playback_active(False)
                 blinders_on_since = None
                 with STATE.lock:
                     STATE.active_animation = 'off (outside schedule)'
+            else:
+                set_playback_active(True)
 
-            # Always fetch camera + run detection (for dashboard monitoring)
-
-            # Fetch camera snapshot (always, even outside schedule)
-            # Re-read config in case it was updated via API
-            cfg = STATE.config
+            # Fetch camera snapshot
             camera = cfg.get('camera_entity', camera)
             ha_url = cfg.get('ha_url', ha_url)
-            ha_token = cfg.get('ha_token', ha_token)
+            ha_token = os.environ.get('HA_TOKEN') or cfg.get('ha_token', '')
 
-            # Prefer browser-supplied 1080p frames over WebRTC 360p
             image = None
             with STATE.lock:
-                browser_jpeg = getattr(STATE, 'browser_frame', None)
+                browser_jpeg = STATE.browser_frame
                 if browser_jpeg:
-                    STATE.browser_frame = None  # consume it
+                    STATE.browser_frame = None
             if browser_jpeg:
                 try:
                     image = Image.open(io.BytesIO(browser_jpeg))
@@ -976,7 +1094,7 @@ def main():
                 time.sleep(poll_sec)
                 continue
 
-            # Save raw snapshot as JPEG for API
+            # Save snapshot for API
             buf = io.BytesIO()
             image.save(buf, format='JPEG', quality=70)
             with STATE.lock:
@@ -986,26 +1104,22 @@ def main():
             min_conf = cfg.get('min_confidence', 0.25)
             min_area = cfg.get('min_area', 0.0005)
             detections = detect_objects(image, min_conf, min_area)
-
-            # Track motion - mark each detection as moving or static
             _motion_tracker.update(detections)
 
             if detections and verbose:
                 summary = ', '.join(f'{d["label"]}:{"M" if d.get("moving") else "S"}' for d in detections)
                 print(f'  [{len(detections)}] {summary}')
 
-            # Only count moving objects as real detections for animation
             moving = [d for d in detections if d.get('moving', False)]
             if moving:
                 last_detection_time = time.time()
 
-            # Report moving objects + static living things
             moving_dets = [d for d in detections
                            if d.get('moving', False) or d['label'] in LIVING]
             with STATE.lock:
                 STATE.detections = moving_dets
                 STATE.last_detection_time = last_detection_time
-                STATE.frame_size = image.size  # (w, h) for overlay scaling
+                STATE.frame_size = image.size
 
             # Draw annotated snapshot
             annotated = image.copy()
@@ -1015,19 +1129,17 @@ def main():
             with STATE.lock:
                 STATE.annotated_jpeg = abuf.getvalue()
 
-            # Skip blinder driving if outside schedule
             if not active:
                 time.sleep(poll_sec)
                 continue
 
-            # Safety: check overheating protection
+            # Safety: overheating protection
             max_on = cfg.get('max_on_minutes', 5) * 60
             cooldown_dur = cfg.get('cooldown_minutes', 10) * 60
             now_ts = time.time()
 
             if now_ts < cooldown_until:
-                if sock and not dry_run:
-                    dmx_blackout(sock)
+                set_playback_active(False)
                 remaining = int((cooldown_until - now_ts) / 60)
                 with STATE.lock:
                     STATE.active_animation = f'cooldown ({remaining}m remaining)'
@@ -1037,8 +1149,7 @@ def main():
             if blinders_on_since and (now_ts - blinders_on_since) > max_on:
                 print(f'Safety: blinders on for {max_on/60:.0f}m, '
                       f'cooling down for {cooldown_dur/60:.0f}m')
-                if sock and not dry_run:
-                    dmx_blackout(sock)
+                set_playback_active(False)
                 blinders_on_since = None
                 cooldown_until = now_ts + cooldown_dur
                 with STATE.lock:
@@ -1046,7 +1157,10 @@ def main():
                 time.sleep(poll_sec)
                 continue
 
-            # Check for pending text message (overrides detection)
+            if blinders_on_since is None:
+                blinders_on_since = time.time()
+
+            # Check for pending text message
             with STATE.lock:
                 msg = STATE.pending_message
                 STATE.pending_message = None
@@ -1054,61 +1168,47 @@ def main():
                 print(f'Scrolling message: {msg["text"]}')
                 text_seq = list(scroll_text(msg['text'], msg['color']))
                 if text_seq:
-                    current_sequence = text_seq
-                    seq_idx = 0
-                    with STATE.lock:
-                        STATE.active_animation = f'text: {msg["text"]}'
-                    # Play full text sequence before resuming detection
-                    for left_g, right_g, ms in text_seq:
-                        if sock and not dry_run:
-                            ld, rd = build_dmx_frames(
-                                left_g, right_g,
-                                cfg.get('brightness', BRIGHTNESS))
-                            send_frame(sock, ld, rd)
-                        time.sleep(ms / 1000.0)
-                    continue  # skip detection this cycle
+                    set_animation(f'text: {msg["text"]}', text_seq,
+                                  cfg.get('brightness', BRIGHTNESS))
+                    # Wait for text to finish
+                    time.sleep(len(text_seq) * 0.15)
+                    continue
 
-            # Pick animation (only from moving + living detections)
+            # Pick animation based on detections
             anim_name, center, best_det = pick_animation(
                 moving_dets, cfg, weather_mood, last_detection_time)
 
             if anim_name is not None:
-                current_sequence = build_animation_sequence(
-                    anim_name, center, cfg, weather_mood)
-                seq_idx = 0
-                with STATE.lock:
-                    STATE.active_animation = anim_name
-                    if best_det:
-                        STATE.active_animation = (
-                            f'{anim_name} ({best_det["label"]} '
-                            f'{best_det["confidence"]:.0%})')
+                label = anim_name
+                if best_det:
+                    # Include coarse position in label so eye-track rebuilds
+                    # when the tracked object moves to a new grid cell.
+                    cx, cy = best_det['center']
+                    gx, gy = int(cx * 10), int(cy * 10)
+                    label = (f'{anim_name} ({best_det["label"]} '
+                             f'{best_det["confidence"]:.0%} {gx},{gy})')
 
-            # Play current frame
-            if current_sequence and seq_idx < len(current_sequence):
-                left_grid, right_grid, frame_ms = current_sequence[seq_idx]
-                if sock and not dry_run:
-                    # Track when blinders are actually lit
-                    is_blackout = (anim_name == 'blackout')
-                    if not is_blackout and blinders_on_since is None:
-                        blinders_on_since = time.time()
-                    elif is_blackout:
-                        blinders_on_since = None
+                # Only rebuild animation if it's actually changing, or
+                # the playback thread signaled it finished (idx=-1 for
+                # hypnotic_mix so we pick the next one in rotation).
+                with _playback_lock:
+                    current = _playback_anim
+                    current_idx = _playback_idx
+                loopable = anim_name in ('weather_mood', 'breathe',
+                                         'idle_scan', 'blackout',
+                                         'hypnotize', 'ripple', 'plasma',
+                                         'pinwheel', 'kaleidoscope')
+                needs_rebuild = (
+                    current != label or
+                    current_idx < 0 or
+                    (not loopable and anim_name != 'hypnotic_mix')
+                )
+                if needs_rebuild:
+                    seq = build_animation_sequence(
+                        anim_name, center, cfg, weather_mood)
+                    set_animation(label, seq, cfg.get('brightness', BRIGHTNESS))
 
-                    left_dmx, right_dmx = build_dmx_frames(
-                        left_grid, right_grid,
-                        cfg.get('brightness', BRIGHTNESS))
-                    send_frame(sock, left_dmx, right_dmx)
-                    with STATE.lock:
-                        STATE.frames_sent += 1
-                seq_idx += 1
-                if seq_idx >= len(current_sequence):
-                    # Loop weather mood, don't loop reactions
-                    if anim_name in ('weather_mood', 'breathe', 'idle_scan'):
-                        current_sequence = build_animation_sequence(
-                            anim_name, center, cfg, weather_mood)
-                        seq_idx = 0
-
-            # Maintain frame rate
+            # Detection loop runs as fast as YOLO allows
             elapsed = time.time() - loop_start
             sleep_time = max(0.01, poll_sec - elapsed)
             time.sleep(sleep_time)
@@ -1116,6 +1216,7 @@ def main():
     except KeyboardInterrupt:
         print('\nShutting down...')
     finally:
+        _playback_stop = True
         if sock and not dry_run:
             dmx_blackout(sock)
             sock.close()

@@ -71,43 +71,41 @@ def _build_artnet_packet(universe, dmx_data):
     return bytes(packet)
 
 
-def _one_blinder_frame(grid, brightness):
-    """Build a clean 512-byte DMX frame for ONE blinder.
-
-    Layout (matching Resolume capture):
-      ch 1-3:  dimmer (255, 255, 255) - full on
-      ch 4-78: 25 RGB pixels (75 bytes)
-      ch 79+:  zero - keeps spot fixtures silent
-    """
-    pixels = grid.to_dmx()  # 75 bytes
-    dmx = bytearray(512)
-
-    # Dimmer channels
-    dmx[0] = 255
-    dmx[1] = 255
-    dmx[2] = 255
-
-    # Pixel data at ch 4 (index 3)
-    for i in range(75):
-        dmx[3 + i] = int(pixels[i] * brightness)
-
-    return dmx
-
-
 def build_dmx_frames(left_grid, right_grid, brightness=None):
-    """Build separate 512-byte DMX frames for each blinder.
+    """Build a shared 512-byte DMX frame with BOTH blinders.
 
-    Each blinder gets its own clean frame with pixel data only at ch 1-78.
-    Nothing above ch 78 is populated, so spot fixtures on higher channels
-    are never activated.
+    Layout (matching Resolume/artnet_eyes_final.py):
+      ch 1-3:    right blinder dimmer (255, 255, 255)
+      ch 4-78:   right blinder 25 RGB pixels (75 bytes)
+      ch 101-102: left blinder dimmer (255, 255)
+      ch 104-178: left blinder 25 RGB pixels (75 bytes)
+      All other channels zero (spots stay off).
+
+    Returns (shared_frame, shared_frame) for API compat — same frame
+    is sent on both uni14 and uni15.
     """
     if brightness is None:
         brightness = BRIGHTNESS
 
-    left_dmx = _one_blinder_frame(left_grid, brightness)
-    right_dmx = _one_blinder_frame(right_grid, brightness)
+    right_px = right_grid.to_dmx()  # 75 bytes, linear order
+    left_px = left_grid.to_dmx()
 
-    return left_dmx, right_dmx
+    dmx = bytearray(512)
+
+    # Right blinder: ch 1-3 dimmer, ch 4-78 pixels
+    dmx[0] = 255
+    dmx[1] = 255
+    dmx[2] = 255
+    for i in range(75):
+        dmx[3 + i] = int(right_px[i] * brightness)
+
+    # Left blinder: ch 101-102 dimmer, ch 104-178 pixels
+    dmx[100] = 255
+    dmx[101] = 255
+    for i in range(75):
+        dmx[103 + i] = int(left_px[i] * brightness)
+
+    return dmx, dmx  # same frame for both universes
 
 
 # Keepalive for DMX chain node (Pixel Octo 19)
@@ -122,33 +120,23 @@ _relay_fail_count = 0
 
 
 def send_frame(sock, left_dmx, right_dmx):
-    """Send Art-Net DMX to both blinders.
+    """Send Art-Net DMX to both blinders via uni14 only.
 
-    Delivery strategy — auto-detects environment:
-    - If ARTNET_RELAY is set or Dell is reachable: send via relay (Mac mode)
-    - If bound to Art-Net NIC (2.x.x.x): unicast directly to ODE nodes (Dell mode)
-    - Relay only forwards to blinder ODEs (uni 14/15), spots stay off
+    Both blinders share ONE 512-byte frame (right at ch 1-78, left at ch 101-178).
+    Spots are on uni15 — we never send there, so they stay off.
+
+    left_dmx and right_dmx are the same shared frame (see build_dmx_frames).
     """
     global _relay_fail_count
-    right_pkt = _build_artnet_packet(RIGHT_UNIVERSE, right_dmx)
-    left_pkt = _build_artnet_packet(LEFT_UNIVERSE, left_dmx)
-
-    # 1. Try Dell relay (primary path when running on Mac)
+    # Only uni14 - shared frame for both blinders. Uni15 is spots, leave alone.
+    pkt = _build_artnet_packet(RIGHT_UNIVERSE, right_dmx)
     try:
-        sock.sendto(right_pkt, (_DELL_RELAY, _DELL_RELAY_PORT))
-        sock.sendto(left_pkt, (_DELL_RELAY, _DELL_RELAY_PORT))
+        sock.sendto(pkt, (_DELL_RELAY, _DELL_RELAY_PORT))
         _relay_fail_count = 0
     except OSError as e:
         _relay_fail_count += 1
         if _relay_fail_count == 1 or _relay_fail_count % 500 == 0:
             print(f'Art-Net relay send failed ({_relay_fail_count}x): {e}')
-
-    # 2. Direct unicast to ODE nodes (works when running on Dell with Art-Net NIC)
-    try:
-        sock.sendto(right_pkt, (RIGHT_NODE, 6454))
-        sock.sendto(left_pkt, (LEFT_NODE, 6454))
-    except OSError:
-        pass
 
 
 def play_sequence(sock, sequence, brightness=None):

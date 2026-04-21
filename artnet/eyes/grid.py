@@ -63,16 +63,13 @@ class Grid:
 
     def to_dmx(self):
         """Convert to 75-byte DMX data (25 pixels × 3 channels RGB).
-        Snake/zigzag distribution: even rows L->R, odd rows R->L."""
+        Linear order: left to right, top to bottom (no snake).
+        This matches the Resolume/artnet_eyes_final.py layout."""
         data = bytearray(75)
         for y in range(5):
             for x in range(5):
-                if y % 2 == 0:
-                    px_x = x  # left to right
-                else:
-                    px_x = 4 - x  # right to left (snake)
                 idx = (y * 5 + x) * 3
-                r, g, b = self.pixels[y][px_x]
+                r, g, b = self.pixels[y][x]
                 data[idx] = min(255, max(0, r))
                 data[idx + 1] = min(255, max(0, g))
                 data[idx + 2] = min(255, max(0, b))

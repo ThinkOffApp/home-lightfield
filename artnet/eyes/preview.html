@@ -833,20 +833,109 @@ function drawDetectionOverlay(detections, frameSize) {
   }
 }
 
-function updateBlinderPreview(status) {
+let _blinderPhase = 0;
+let _blinderAnimTimer = null;
+
+function startBlinderAnim() {
+  if (_blinderAnimTimer) return;
+  _blinderAnimTimer = setInterval(() => {
+    _blinderPhase = (_blinderPhase + 0.02) % 1.0;
+    renderBlinderFrame();
+  }, 50);
+}
+
+function renderBlinderFrame() {
   const bL = document.getElementById('blinder-L');
   const bR = document.getElementById('blinder-R');
-  // Show eye tracking if there's a person detection with center coords
-  const det = status.detections && status.detections[0];
-  if (det && det.center) {
+  if (!bL || !bR) return;
+  const ctxL = bL.getContext('2d');
+  const ctxR = bR.getContext('2d');
+
+  // Prefer live grid data from detector — this is exactly what's on blinders
+  if (window._liveLeftGrid && window._liveRightGrid) {
+    drawGrid(ctxL, window._liveLeftGrid);
+    drawGrid(ctxR, window._liveRightGrid);
+    return;
+  }
+
+  const anim = window._currentBlinderAnim || 'idle';
+  const det = window._currentBlinderDet || null;
+  const p = _blinderPhase;
+
+  if (anim.startsWith('track') && det && det.center) {
     const lx = (det.center[0] - 0.5) * 2;
     const ly = Math.max(-0.5, Math.min(1, (det.center[1] - 0.3) * 1.5));
-    drawGrid(bL.getContext('2d'), eyeOpen(lx, ly));
-    drawGrid(bR.getContext('2d'), eyeOpen(lx, ly, TK_CORE));
+    drawGrid(ctxL, eyeOpen(lx, ly));
+    drawGrid(ctxR, eyeOpen(lx, ly, TK_CORE));
+  } else if (anim.startsWith('weather_mood') || anim.startsWith('breathe')) {
+    const g = eyeBreathe(p, TK_CORE, TK_MAGENTA);
+    drawGrid(ctxL, g);
+    drawGrid(ctxR, g);
+  } else if (anim.startsWith('love')) {
+    drawGrid(ctxL, eyeHeart());
+    drawGrid(ctxR, eyeHeart());
+  } else if (anim.startsWith('surprise')) {
+    drawGrid(ctxL, eyeWide(0, 0));
+    drawGrid(ctxR, eyeWide(0, 0));
+  } else if (anim.startsWith('hypnotize')) {
+    const g = eyeSpiral(p);
+    drawGrid(ctxL, g);
+    drawGrid(ctxR, g);
+  } else if (anim.includes('ripple')) {
+    drawGrid(ctxL, eyeRipple(p, THINKOFF_PALETTE));
+    drawGrid(ctxR, eyeRipple(p, THINKOFF_PALETTE));
+  } else if (anim.includes('plasma')) {
+    drawGrid(ctxL, eyePlasma(p, PINK_FUCHSIA));
+    drawGrid(ctxR, eyePlasma(p, PINK_FUCHSIA));
+  } else if (anim.includes('kaleidoscope')) {
+    drawGrid(ctxL, eyeKaleidoscope(p, THINKOFF_PALETTE));
+    drawGrid(ctxR, eyeKaleidoscope(p, THINKOFF_PALETTE));
+  } else if (anim.includes('pinwheel')) {
+    drawGrid(ctxL, eyePinwheel(p, THINKOFF_PALETTE));
+    drawGrid(ctxR, eyePinwheel(p, THINKOFF_PALETTE));
+  } else if (anim.includes('rain')) {
+    drawGrid(ctxL, eyeRain(p, THINKOFF_PALETTE));
+    drawGrid(ctxR, eyeRain(p, THINKOFF_PALETTE));
+  } else if (anim.startsWith('idle_scan')) {
+    const lx = Math.sin(p * Math.PI * 2) * 0.8;
+    drawGrid(ctxL, eyeOpen(lx, 0.5));
+    drawGrid(ctxR, eyeOpen(lx, 0.5, TK_CORE));
+  } else if (anim.startsWith('text:')) {
+    const txt = anim.slice(5).trim();
+    const cols = textToCols(txt);
+    const total = cols.length || 1;
+    const offset = Math.floor(p * total * 3);
+    // Render across 10 columns (left=0-4, right=5-9)
+    const gL = emptyGrid(), gR = emptyGrid();
+    for (let x = 0; x < 10; x++) {
+      const ci = ((offset + x) % total + total) % total;
+      for (let y = 0; y < 5; y++) {
+        if (cols[ci][y]) {
+          if (x < 5) gL[y][x] = [...TK_CORE];
+          else gR[y][x-5] = [...TK_CORE];
+        }
+      }
+    }
+    drawGrid(ctxL, gL);
+    drawGrid(ctxR, gR);
+  } else if (anim.startsWith('off') || anim.startsWith('blackout') || anim.startsWith('cooldown')) {
+    drawGrid(ctxL, emptyGrid());
+    drawGrid(ctxR, emptyGrid());
   } else {
-    drawGrid(bL.getContext('2d'), eyeOpen(0, 0.5));
-    drawGrid(bR.getContext('2d'), eyeOpen(0, 0.5, TK_CORE));
+    drawGrid(ctxL, eyeOpen(0, 0.5));
+    drawGrid(ctxR, eyeOpen(0, 0.5, TK_CORE));
   }
+}
+
+function updateBlinderPreview(status) {
+  window._currentBlinderAnim = status.active_animation || 'idle';
+  window._currentBlinderDet = (status.detections && status.detections[0]) || null;
+  // If detector provides live grid data, render that directly — exactly what's on blinders
+  if (status.left_grid && status.right_grid) {
+    window._liveLeftGrid = status.left_grid;
+    window._liveRightGrid = status.right_grid;
+  }
+  startBlinderAnim();
 }
 
 // ==================== SETTINGS ====================

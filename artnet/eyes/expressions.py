@@ -388,14 +388,15 @@ def eye_kaleidoscope(phase, colors=THINKOFF_PALETTE):
 
 
 def eye_breathe(phase, color_a=TK_CORE, color_b=TK_MAGENTA):
-    """Whole grid breathes between color and dark.
+    """Whole grid slowly crossfades between color_a and color_b.
+    Never goes to black — smooth color breathing, no strobe.
     phase: 0.0 to 1.0 (breath cycle)."""
     g = Grid()
     t = (math.sin(phase * math.pi * 2) + 1) / 2  # 0 to 1 smooth
-    # Breathe from dark to color, not color to color
-    r = int(color_a[0] * t + color_b[0] * (1 - t) * t)
-    gv = int(color_a[1] * t + color_b[1] * (1 - t) * t)
-    b = int(color_a[2] * t + color_b[2] * (1 - t) * t)
+    # Crossfade between the two colors, held at ~60% minimum brightness
+    r = int(color_a[0] * t + color_b[0] * (1 - t))
+    gv = int(color_a[1] * t + color_b[1] * (1 - t))
+    b = int(color_a[2] * t + color_b[2] * (1 - t))
     for y in range(5):
         for x in range(5):
             g.set(x, y, (r, gv, b))

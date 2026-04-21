@@ -7,8 +7,8 @@
     "camera.alakerta_kamera": "Ground Floor",
     "camera.entryway_doorbell": "Doorbell"
   },
-  "poll_interval_sec": 1.5,
-  "min_confidence": 0.25,
+  "poll_interval_sec": 0.5,
+  "min_confidence": 0.5,
   "min_area": 0.0005,
   "location": {
     "lat": 60.17,
@@ -20,11 +20,11 @@
       "end": "sunset+60m"
     }
   ],
-  "always_on": false,
+  "always_on": true,
   "weather_reactive": true,
-  "idle_timeout_sec": 10,
-  "max_on_minutes": 5,
-  "cooldown_minutes": 10,
+  "idle_timeout_sec": 5,
+  "max_on_minutes": 60,
+  "cooldown_minutes": 5,
   "brightness": 0.5,
   "mappings": {
     "person": {
@@ -56,12 +56,12 @@
       "priority": 4
     },
     "default": {
-      "animation": "idle_scan",
+      "animation": "track",
       "priority": 99
     },
     "nothing": {
-      "animation": "weather_mood",
-      "after_seconds": 10
+      "animation": "idle_scan",
+      "after_seconds": 5
     }
   },
   "weather_moods": {
