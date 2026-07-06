@@ -36,6 +36,35 @@ TK_EDGE    = (240, 208, 248)    # palest pink
 
 THINKOFF_PALETTE = [TK_WHITE, TK_BLUE, TK_INDIGO, TK_MAGENTA, TK_CORE, TK_MID, TK_EDGE]
 
+# Eye color schemes: (iris, pupil, eyeball_white, eyelid_background)
+# Mixed ThinkOff + classic combos. Each has a different mood.
+EYE_SCHEMES = [
+    # Classic brand — blue iris on light pink
+    ((96, 165, 250),  (0, 0, 0),        (240, 208, 248), (10, 0, 20)),
+    # Magenta burn — hot pink iris, white pupil highlight on dark
+    ((217, 70, 239),  (255, 255, 255),  (240, 208, 248), (0, 0, 0)),
+    # Soft pink on pink — core iris, magenta pupil on mid pink
+    ((212, 165, 233), (217, 70, 239),   (240, 208, 248), (0, 0, 0)),
+    # Indigo dream — indigo iris, magenta pupil, pink white
+    ((165, 180, 252), (217, 70, 239),   (232, 197, 245), (0, 0, 0)),
+    # Fuchsia electric — hot pink iris, dark pupil, bright white
+    ((255, 0, 255),   (0, 0, 0),        (255, 255, 255), (10, 0, 20)),
+    # Ocean — blue iris, indigo pupil, edge-pink white
+    ((96, 165, 250),  (165, 180, 252),  (240, 208, 248), (0, 0, 0)),
+    # Inverted — white iris (!), magenta pupil on pink background
+    ((255, 255, 255), (217, 70, 239),   (212, 165, 233), (0, 0, 0)),
+    # Core focus — primary pink iris, black pupil on white
+    ((212, 165, 233), (0, 0, 0),        (255, 255, 255), (0, 0, 0)),
+    # Night — deep magenta iris, black pupil on midnight blue background
+    ((217, 70, 239),  (0, 0, 0),        (165, 180, 252), (5, 10, 40)),
+    # Pastel dream — edge pink iris, indigo pupil on white
+    ((240, 208, 248), (165, 180, 252),  (255, 255, 255), (10, 0, 20)),
+    # Hot candy — fuchsia iris, core pink pupil on edge white
+    ((255, 0, 255),   (212, 165, 233),  (240, 208, 248), (0, 0, 0)),
+    # Violet twilight — dark violet iris, white pupil on indigo
+    ((148, 0, 211),   (255, 255, 255),  (165, 180, 252), (0, 0, 0)),
+]
+
 # Pink-fuchsia-purple gradient
 PINK_FUCHSIA = [
     (255, 105, 180),   # hot pink
@@ -51,45 +80,69 @@ def _distance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
+# Hand-designed 5x5 eye pixel maps (matches preview.html exactly).
+# Values: 0=eyelid, 1=white, 2=iris, 3=pupil.
+# Using "NM" (normal) style - larger iris for park view.
+_EYE_MAPS = {
+    'center':     [[0,1,1,1,0],[1,2,2,2,1],[1,2,3,2,1],[1,2,2,2,1],[0,1,1,1,0]],
+    'left':       [[0,1,1,1,0],[2,2,1,1,1],[2,3,2,1,1],[2,2,1,1,1],[0,1,1,1,0]],
+    'far_left':   [[0,1,1,1,0],[2,2,1,1,1],[3,2,1,1,1],[2,2,1,1,1],[0,1,1,1,0]],
+    'right':      [[0,1,1,1,0],[1,1,1,2,2],[1,1,2,3,2],[1,1,1,2,2],[0,1,1,1,0]],
+    'far_right':  [[0,1,1,1,0],[1,1,1,2,2],[1,1,1,2,3],[1,1,1,2,2],[0,1,1,1,0]],
+    'up':         [[0,2,2,2,0],[1,2,3,2,1],[1,2,2,2,1],[1,1,1,1,1],[0,1,1,1,0]],
+    'down':       [[0,1,1,1,0],[1,1,1,1,1],[1,2,2,2,1],[1,2,3,2,1],[0,2,2,2,0]],
+    'up_left':    [[0,2,2,1,0],[2,3,2,1,1],[2,2,1,1,1],[1,1,1,1,1],[0,1,1,1,0]],
+    'up_right':   [[0,1,2,2,0],[1,1,2,3,2],[1,1,1,2,2],[1,1,1,1,1],[0,1,1,1,0]],
+    'down_left':  [[0,1,1,1,0],[1,1,1,1,1],[2,2,1,1,1],[2,3,2,1,1],[0,2,2,1,0]],
+    'down_right': [[0,1,1,1,0],[1,1,1,1,1],[1,1,1,2,2],[1,1,2,3,2],[0,1,2,2,0]],
+}
+
+_WIDE_MAP = [[1,1,1,1,1],[1,2,2,2,1],[1,2,3,2,1],[1,2,2,2,1],[1,1,1,1,1]]
+_SQUINT_MAP = [[0,0,0,0,0],[0,0,0,0,0],[1,2,3,2,1],[0,0,0,0,0],[0,0,0,0,0]]
+_CLOSED_MAP = [[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0],[0,0,0,0,0]]
+_BLINK_MID_MAP = [[0,0,0,0,0],[0,0,0,0,0],[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0]]
+
+
+def _pick_direction(look_x, look_y):
+    """Map continuous look_x/look_y to one of 11 discrete directions."""
+    if look_y < -0.1:
+        if look_x < -0.2: return 'up_left'
+        if look_x > 0.2: return 'up_right'
+        return 'up'
+    if look_y > 0.7:
+        if look_x < -0.2: return 'down_left'
+        if look_x > 0.2: return 'down_right'
+        return 'down'
+    if look_x < -0.6: return 'far_left'
+    if look_x < -0.2: return 'left'
+    if look_x > 0.6: return 'far_right'
+    if look_x > 0.2: return 'right'
+    return 'center'
+
+
+def _map_to_grid(pixel_map, iris_color=IRIS_COLOR, pupil_color=PUPIL_COLOR,
+                 white_color=WHITE_COLOR, eyelid_color=EYELID_COLOR):
+    """Render a 5x5 pixel map into a Grid.
+    Map values: 0=eyelid, 1=white, 2=iris, 3=pupil."""
+    g = Grid()
+    palette = {0: eyelid_color, 1: white_color, 2: iris_color, 3: pupil_color}
+    for y in range(5):
+        for x in range(5):
+            g.set(x, y, palette[pixel_map[y][x]])
+    return g
+
+
 def eye_open(look_x=0.0, look_y=0.5, iris_color=IRIS_COLOR,
              pupil_color=PUPIL_COLOR, white_color=WHITE_COLOR,
              eyelid_color=EYELID_COLOR):
-    """
-    Open eye looking in a direction.
+    """Open eye looking in a direction.
 
     look_x: -1.0 (far left) to 1.0 (far right), 0 = center
-    look_y: -1.0 (up) to 1.0 (down), 0.5 = slightly down (default, overlooking park)
+    look_y: -1.0 (up) to 1.0 (down), 0.5 = slightly down (overlooking park)
     """
-    g = Grid()
-
-    # Eye center with look offset
-    cx = 2.0 + look_x * 1.2
-    cy = 2.0 + look_y * 0.8
-
-    for y in range(5):
-        for x in range(5):
-            d = _distance(x, y, cx, cy)
-
-            if d < 0.6:
-                # Pupil
-                g.set(x, y, pupil_color)
-            elif d < 1.5:
-                # Iris
-                g.set(x, y, iris_color)
-            elif d < 2.5:
-                # Eye white
-                g.set(x, y, white_color)
-            else:
-                # Outside eye
-                g.set(x, y, eyelid_color)
-
-    # Specular highlight - always top-right of pupil
-    hx = int(cx + 0.7)
-    hy = int(cy - 0.7)
-    if 0 <= hx < 5 and 0 <= hy < 5:
-        g.set(hx, hy, HIGHLIGHT_COLOR)
-
-    return g
+    direction = _pick_direction(look_x, look_y)
+    return _map_to_grid(_EYE_MAPS[direction],
+                        iris_color, pupil_color, white_color, eyelid_color)
 
 
 def eye_half_closed(look_x=0.0, look_y=0.5, iris_color=IRIS_COLOR,
@@ -103,80 +156,32 @@ def eye_half_closed(look_x=0.0, look_y=0.5, iris_color=IRIS_COLOR,
     return g
 
 
-def eye_closed(eyelid_color=EYELID_COLOR):
-    """Fully closed eye (blink frame)."""
-    g = Grid()
-    g.clear(eyelid_color)
-    # Single line across the middle - dim lash line
-    for x in range(5):
-        g.set(x, 2, (30, 30, 30))
-    return g
+def eye_closed(eyelid_color=EYELID_COLOR, white_color=WHITE_COLOR):
+    """Fully closed eye (lash line)."""
+    return _map_to_grid(_CLOSED_MAP, white_color=white_color,
+                        eyelid_color=eyelid_color)
 
 
 def eye_blink_top(white_color=WHITE_COLOR, eyelid_color=EYELID_COLOR):
     """Eyelid coming down - mid-blink."""
-    g = Grid()
-    for x in range(5):
-        g.set(x, 0, eyelid_color)
-        g.set(x, 1, eyelid_color)
-        g.set(x, 2, (80, 80, 80))  # lash line
-    # Peek of eye below
-    for x in range(1, 4):
-        g.set(x, 3, white_color)
-    return g
+    return _map_to_grid(_BLINK_MID_MAP, white_color=white_color,
+                        eyelid_color=eyelid_color)
 
 
 def eye_wide(look_x=0.0, look_y=0.0, iris_color=IRIS_COLOR,
-             pupil_color=PUPIL_COLOR, white_color=WHITE_COLOR):
+             pupil_color=PUPIL_COLOR, white_color=WHITE_COLOR,
+             eyelid_color=EYELID_COLOR):
     """Wide open surprised eye."""
-    g = Grid()
-
-    cx = 2.0 + look_x * 0.8
-    cy = 2.0 + look_y * 0.5
-
-    for y in range(5):
-        for x in range(5):
-            d = _distance(x, y, cx, cy)
-
-            if d < 0.5:
-                g.set(x, y, pupil_color)
-            elif d < 1.2:
-                # Smaller iris = more white visible = surprised
-                g.set(x, y, iris_color)
-            else:
-                # All white - wide open
-                g.set(x, y, white_color)
-
-    hx = int(cx + 0.7)
-    hy = int(cy - 0.7)
-    if 0 <= hx < 5 and 0 <= hy < 5:
-        g.set(hx, hy, HIGHLIGHT_COLOR)
-
-    return g
+    return _map_to_grid(_WIDE_MAP, iris_color, pupil_color, white_color,
+                        eyelid_color)
 
 
 def eye_squint(look_x=0.0, iris_color=IRIS_COLOR,
                pupil_color=PUPIL_COLOR, white_color=WHITE_COLOR,
                eyelid_color=EYELID_COLOR):
-    """Squinting eye (bright light or suspicious)."""
-    g = Grid()
-    # Top two and bottom two rows closed
-    for x in range(5):
-        g.set(x, 0, eyelid_color)
-        g.set(x, 1, eyelid_color)
-        g.set(x, 3, eyelid_color)
-        g.set(x, 4, eyelid_color)
-    # Only middle row visible
-    cx = 2.0 + look_x * 1.0
-    for x in range(5):
-        d = abs(x - cx)
-        if d < 0.6:
-            g.set(x, 2, pupil_color)
-        elif d < 1.5:
-            g.set(x, 2, iris_color)
-        else:
-            g.set(x, 2, white_color)
-    return g
+    """Squinting eye - single middle row."""
+    return _map_to_grid(_SQUINT_MAP, iris_color, pupil_color, white_color,
+                        eyelid_color)
 
 
 def eye_supernova(phase, iris_color=IRIS_COLOR):

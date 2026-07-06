@@ -21,7 +21,7 @@ from expressions import (
     eye_ripple, eye_plasma, eye_pinwheel, eye_rain,
     eye_kaleidoscope, eye_breathe, eye_scroll_text, eye_scroll_text_wide,
     _text_to_columns,
-    IRIS_COLOR, LOOK_POSITIONS,
+    IRIS_COLOR, LOOK_POSITIONS, EYE_SCHEMES,
     THINKOFF_PALETTE, PINK_FUCHSIA,
     TK_CORE, TK_MID, TK_EDGE, TK_MAGENTA, TK_BLUE, TK_INDIGO,
 )
@@ -344,3 +344,139 @@ def scroll_text(text, color=TK_CORE, speed_ms=150, loops=2):
         for offset in range(total):
             left, right = eye_scroll_text_wide(text, offset, color)
             yield (left, right, speed_ms)
+
+
+# --- Lively eye tracking ---
+
+# Persistent state across calls so the track-lively animation builds a coherent
+# stream of events rather than restarting every few seconds.
+_lively_state = {
+    'scheme_idx': 0,
+    'left_scheme_idx': 0,   # independent color per eye, for extra variety
+    'frames_since_scheme_change': 0,
+    'frames_since_blink': 0,
+    'next_blink_at': 90,   # ~4.5s at 20fps
+    'next_wink_at': 400,   # ~20s at 20fps
+    'frames_since_wink': 0,
+    'wink_side': 'right',
+}
+
+
+def _scheme_colors(idx):
+    scheme = EYE_SCHEMES[idx % len(EYE_SCHEMES)]
+    return scheme  # (iris, pupil, white, eyelid)
+
+
+def _eye_with_scheme(look_x, look_y, scheme):
+    iris, pupil, eyeball, eyelid = scheme
+    return eye_open(look_x, look_y, iris, pupil, eyeball, eyelid)
+
+
+def eye_track_lively(look_x=0.0, look_y=0.5, duration_sec=3.0):
+    """Lively eye tracking — position follows look coords, with slow color
+    cycling, occasional blinks, and rare winks. Generates N frames of
+    animation at 20fps."""
+    import random as _random
+    s = _lively_state
+    frames = int(duration_sec * 20)  # 20fps
+    frame_ms = 50
+
+    for _ in range(frames):
+        s['frames_since_scheme_change'] += 1
+        s['frames_since_blink'] += 1
+        s['frames_since_wink'] += 1
+
+        # Slow color scheme crossfade every ~25-45 seconds
+        if s['frames_since_scheme_change'] > _random.randint(500, 900):
+            s['scheme_idx'] = (s['scheme_idx'] + 1) % len(EYE_SCHEMES)
+            # Sometimes change the left eye independently for a mismatched look
+            if _random.random() < 0.4:
+                s['left_scheme_idx'] = (s['scheme_idx']
+                                        + _random.randint(1, 3)) % len(EYE_SCHEMES)
+            else:
+                s['left_scheme_idx'] = s['scheme_idx']
+            s['frames_since_scheme_change'] = 0
+
+        right_scheme = _scheme_colors(s['scheme_idx'])
+        left_scheme = _scheme_colors(s['left_scheme_idx'])
+
+        # Blink occasionally (every 4-9 seconds)
+        if s['frames_since_blink'] >= s['next_blink_at']:
+            s['frames_since_blink'] = 0
+            s['next_blink_at'] = _random.randint(80, 180)
+            # Short blink: open -> blink_mid -> closed -> blink_mid -> open
+            blink_seq = [
+                (None, 40),            # last open frame (placeholder)
+                ('blink_mid', 60),
+                ('closed', 80),
+                ('blink_mid', 60),
+                (None, 20),
+            ]
+            for kind, ms in blink_seq:
+                if kind is None:
+                    right = _eye_with_scheme(look_x, look_y, right_scheme)
+                    left = _eye_with_scheme(look_x, look_y, left_scheme)
+                elif kind == 'closed':
+                    right = eye_closed(right_scheme[3], right_scheme[2])
+                    left = eye_closed(left_scheme[3], left_scheme[2])
+                else:
+                    right = eye_blink_top(right_scheme[2], right_scheme[3])
+                    left = eye_blink_top(left_scheme[2], left_scheme[3])
+                yield (left, right, ms)
+            continue
+
+        # Wink occasionally (every 15-40 seconds)
+        if s['frames_since_wink'] >= s['next_wink_at']:
+            s['frames_since_wink'] = 0
+            s['next_wink_at'] = _random.randint(300, 800)
+            s['wink_side'] = 'right' if _random.random() < 0.5 else 'left'
+            open_right = _eye_with_scheme(look_x, look_y, right_scheme)
+            open_left = _eye_with_scheme(look_x, look_y, left_scheme)
+            closed_right = eye_closed(right_scheme[3], right_scheme[2])
+            closed_left = eye_closed(left_scheme[3], left_scheme[2])
+            wink_seq = [(60, 'open'), (50, 'half'), (180, 'full'),
+                        (50, 'half'), (40, 'open')]
+            for ms, stage in wink_seq:
+                if s['wink_side'] == 'right':
+                    left = open_left
+                    if stage == 'full': right = closed_right
+                    elif stage == 'half': right = eye_blink_top(right_scheme[2], right_scheme[3])
+                    else: right = open_right
+                else:
+                    right = open_right
+                    if stage == 'full': left = closed_left
+                    elif stage == 'half': left = eye_blink_top(left_scheme[2], left_scheme[3])
+                    else: left = open_left
+                yield (left, right, ms)
+            continue
+
+        # Normal frame — just the eye tracking
+        right = _eye_with_scheme(look_x, look_y, right_scheme)
+        left = _eye_with_scheme(look_x, look_y, left_scheme)
+        yield (left, right, frame_ms)
+
+
+def idle_lively(duration_sec=30.0):
+    """Idle mode with lively eyes: slow scanning, blinks, winks, color cycling."""
+    import random as _random
+    start = time.time()
+    target_x = 0.0
+    target_y = 0.5
+    while time.time() - start < duration_sec:
+        # Pick a new random target every 2-5 seconds, smooth-scan to it
+        new_x = _random.uniform(-0.8, 0.8)
+        new_y = _random.uniform(0.2, 0.8)
+        hold = _random.uniform(2.0, 5.0)
+
+        # Smooth-interpolate for ~500ms
+        steps = 10
+        for i in range(steps):
+            t = (i + 1) / steps
+            x = target_x + (new_x - target_x) * t
+            y = target_y + (new_y - target_y) * t
+            yield from eye_track_lively(x, y, duration_sec=0.05)
+
+        target_x, target_y = new_x, new_y
+
+        # Hold at target with blinks/color cycling
+        yield from eye_track_lively(target_x, target_y, duration_sec=hold)
