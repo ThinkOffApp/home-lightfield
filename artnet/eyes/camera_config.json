@@ -1,11 +1,15 @@
 {
   "ha_url": "http://localhost:8123",
   "ha_token": "",
+  "camera_source": "reolink_snap",
+  "reolink_host": "192.168.50.167",
+  "mirror_x": false,
   "camera_entity": "camera.alakerta_kamera",
   "cameras": {
     "camera.tyohuone_camera": "Office",
     "camera.alakerta_kamera": "Ground Floor",
-    "camera.entryway_doorbell": "Doorbell"
+    "camera.entryway_doorbell": "Doorbell",
+    "reolink_snap": "North Window (park, direct)"
   },
   "poll_interval_sec": 0.5,
   "min_confidence": 0.5,
@@ -28,7 +32,7 @@
   "brightness": 0.5,
   "mappings": {
     "person": {
-      "animation": "track",
+      "animation": "track_lively",
       "priority": 1
     },
     "dog": {
@@ -40,15 +44,15 @@
       "priority": 2
     },
     "car": {
-      "animation": "track",
+      "animation": "track_lively",
       "priority": 3
     },
     "truck": {
-      "animation": "track",
+      "animation": "track_lively",
       "priority": 3
     },
     "bicycle": {
-      "animation": "track",
+      "animation": "track_lively",
       "priority": 3
     },
     "bird": {
@@ -56,11 +60,11 @@
       "priority": 4
     },
     "default": {
-      "animation": "track",
+      "animation": "track_lively",
       "priority": 99
     },
     "nothing": {
-      "animation": "idle_scan",
+      "animation": "idle_lively",
       "after_seconds": 5
     }
   },

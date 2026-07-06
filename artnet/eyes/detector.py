@@ -26,6 +26,8 @@ from urllib.parse import urlparse, parse_qs
 
 import asyncio
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # Reolink self-signed cert
 from PIL import Image
 import numpy as np
 from astral import LocationInfo
@@ -241,6 +243,50 @@ def fetch_snapshot(ha_url, ha_token, entity_id):
     except Exception as e:
         print(f'Snapshot fetch failed: {e}')
         return None
+
+
+# ---------------------------------------------------------------------------
+# Reolink direct snapshot grabber (north-window park camera)
+#
+# Pulls full-res 4K JPEGs straight from the camera's Snap API — no HA proxy,
+# no WebRTC, no continuous video decode. Fits the poll loop naturally: one
+# HTTPS GET per detection cycle. Token is cached and refreshed on failure.
+# Credentials live in .env (REOLINK_USERNAME / REOLINK_PASSWORD), never here.
+# ---------------------------------------------------------------------------
+
+_reolink_token = {'value': None}
+
+def _reolink_login(host, user, password):
+    body = [{"cmd": "Login", "action": 0,
+             "param": {"User": {"userName": user, "password": password}}}]
+    r = requests.post(f'https://{host}/cgi-bin/api.cgi?cmd=Login',
+                      json=body, timeout=10, verify=False)
+    r.raise_for_status()
+    return r.json()[0]['value']['Token']['name']
+
+
+def fetch_reolink_snapshot(host, user, password):
+    """Fetch a full-res snapshot from the Reolink Snap API. PIL Image or None."""
+    for attempt in range(2):
+        try:
+            if not _reolink_token['value']:
+                _reolink_token['value'] = _reolink_login(host, user, password)
+            r = requests.get(
+                f'https://{host}/cgi-bin/api.cgi',
+                params={'cmd': 'Snap', 'channel': 0,
+                        'rs': str(int(time.time() * 1000) % 100000),
+                        'token': _reolink_token['value']},
+                timeout=10, verify=False)
+            r.raise_for_status()
+            if r.headers.get('Content-Type', '').startswith('image'):
+                return Image.open(io.BytesIO(r.content))
+            # JSON error body → token expired; re-login once
+            _reolink_token['value'] = None
+        except Exception as e:
+            _reolink_token['value'] = None
+            if attempt == 1:
+                print(f'Reolink snapshot failed: {e}')
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -651,9 +697,17 @@ def build_animation_sequence(anim_name, center, cfg, weather_mood):
 
     if anim_name == 'track' and center:
         x_norm, y_norm = center
-        # Build a smooth 1-second hold so eye moves smoothly to new positions
+        # Basic tracking: single static eye at target position
         look = look_at_xy(x_norm, y_norm, iris_color=TK_CORE)
         return [(look, look, 50)] * 20
+    elif anim_name == 'track_lively' and center:
+        x_norm, y_norm = center
+        # Lively tracking: eye follows target with blinks, winks, color cycles
+        look_x = (x_norm - 0.5) * 2.0
+        look_y = max(-0.5, min(1.0, (y_norm - 0.3) * 1.5))
+        return list(eye_track_lively(look_x, look_y, duration_sec=3.0))
+    elif anim_name == 'idle_lively':
+        return list(idle_lively(30.0))
     elif anim_name == 'love':
         return list(love())
     elif anim_name == 'surprise':
@@ -1001,10 +1055,11 @@ def main():
                         if _playback_anim in ('weather_mood', 'breathe',
                                               'idle_scan', 'blackout',
                                               'hypnotize', 'ripple', 'plasma',
-                                              'pinwheel', 'kaleidoscope'):
+                                              'pinwheel', 'kaleidoscope',
+                                              'idle_lively'):
                             _playback_idx = 0
-                        elif _playback_anim == 'hypnotic_mix':
-                            # Signal main loop to rebuild with next anim in cycle
+                        elif _playback_anim in ('hypnotic_mix', 'track_lively'):
+                            # Signal main loop to rebuild (next segment)
                             _playback_idx = -1
                         # For one-shot anims, keep last frame
             elif last_dmx:
@@ -1089,7 +1144,14 @@ def main():
                 except Exception:
                     pass
             if image is None:
-                image = fetch_webrtc_frame(ha_url, ha_token, camera)
+                source = cfg.get('camera_source', 'ha_webrtc')
+                if source == 'reolink_snap':
+                    image = fetch_reolink_snapshot(
+                        cfg.get('reolink_host', '192.168.50.167'),
+                        os.environ.get('REOLINK_USERNAME', ''),
+                        os.environ.get('REOLINK_PASSWORD', ''))
+                else:
+                    image = fetch_webrtc_frame(ha_url, ha_token, camera)
             if image is None:
                 time.sleep(poll_sec)
                 continue
@@ -1178,6 +1240,14 @@ def main():
             anim_name, center, best_det = pick_animation(
                 moving_dets, cfg, weather_mood, last_detection_time)
 
+            # Optional horizontal flip between camera frame and eye gaze.
+            # The park camera and the blinder eyes face the same direction,
+            # but if the eyes appear to look the wrong way from the street,
+            # flip this in config rather than touching animation code.
+            # Applied only to the gaze path — preview overlays keep raw coords.
+            if center and cfg.get('mirror_x', False):
+                center = (1.0 - center[0], center[1])
+
             if anim_name is not None:
                 label = anim_name
                 if best_det:
@@ -1197,11 +1267,13 @@ def main():
                 loopable = anim_name in ('weather_mood', 'breathe',
                                          'idle_scan', 'blackout',
                                          'hypnotize', 'ripple', 'plasma',
-                                         'pinwheel', 'kaleidoscope')
+                                         'pinwheel', 'kaleidoscope',
+                                         'idle_lively')
+                rebuild_anims = ('hypnotic_mix', 'track_lively')
                 needs_rebuild = (
                     current != label or
                     current_idx < 0 or
-                    (not loopable and anim_name != 'hypnotic_mix')
+                    (not loopable and anim_name not in rebuild_anims)
                 )
                 if needs_rebuild:
                     seq = build_animation_sequence(
